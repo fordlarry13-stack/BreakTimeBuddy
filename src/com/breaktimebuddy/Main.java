@@ -10,7 +10,7 @@ public class Main extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        Label label = new Label("Break Time Buddy - Project Started");
+        Label label = new Label("Break Time Buddy - Project Started (test)");
         StackPane root = new StackPane(label);
         Scene scene = new Scene(root, 400, 300);
 
