@@ -1,5 +1,6 @@
 {
   "editor.formatOnSave": true,
+  "editor.defaultFormatter": "redhat.java",
   "editor.rulers": [
     100
   ],
