@@ -15,6 +15,11 @@
         </dependency>
         <!-- AI-generated: JUnit 5 dependency for testing -->
         <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.14.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.10.0</version>
@@ -65,6 +70,7 @@
                         <id>default-cli</id>
                         <configuration>
                             <mainClass>com.breaktimebuddy.App</mainClass>
+                            <workingDirectory>target</workingDirectory>
                         </configuration>
                     </execution>
                 </executions>
