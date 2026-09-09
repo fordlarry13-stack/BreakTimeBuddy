@@ -58,19 +58,8 @@ class ConfigHandlerTest {
 
     @Test
     void testReadThrowsIOExceptionWhenStorageThrows() throws IOException {
-        // Arrange
-        storage = new Storage() {
-            @Override
-            public InputStream in() throws IOException {
-                throw new IOException("forced error");
-            }
-
-            @Override
-            public OutputStream out() throws IOException {
-                return new ByteArrayOutputStream();
-            }
-        };
-        handler = new ConfigHandler(storage);
+        // Arrange: Simulate input failure
+        ((FakeStorage) storage).setThrowOnIn(true);
 
         // Act & Assert
         assertThrows(IOException.class, () -> handler.read());
@@ -78,20 +67,9 @@ class ConfigHandlerTest {
 
     @Test
     void testWriteThrowsIOExceptionWhenStorageThrows() throws IOException {
-        // Arrange
+        // Arrange: Simulate output failure
+        ((FakeStorage) storage).setThrowOnOut(true);
         ConfigData data = new ConfigData(1);
-        storage = new Storage() {
-            @Override
-            public InputStream in() throws IOException {
-                return new ByteArrayInputStream(new byte[0]);
-            }
-
-            @Override
-            public OutputStream out() throws IOException {
-                throw new IOException("forced error");
-            }
-        };
-        handler = new ConfigHandler(storage);
 
         // Act & Assert
         assertThrows(IOException.class, () -> handler.write(data));
@@ -110,6 +88,14 @@ class ConfigHandlerTest {
 
         public void setOutputCaptor(ByteArrayOutputStream outBytes) {
             this.outputCaptor = outBytes;
+        }
+
+        public void setThrowOnIn(boolean value) {
+            this.throwOnIn = value;
+        }
+
+        public void setThrowOnOut(boolean value) {
+            this.throwOnOut = value;
         }
 
         @Override
