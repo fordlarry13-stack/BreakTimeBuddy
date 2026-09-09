@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.google.gson.JsonSyntaxException;
 
 class ConfigHandlerTest {
 
@@ -27,7 +28,7 @@ class ConfigHandlerTest {
     }
 
     @Test
-    void testReadReturnsConfigData() throws IOException {
+    void testReadReturnsConfigData() throws IOException, JsonSyntaxException {
         // Arrange: storage provides valid JSON for ConfigData with sessions = 5
         String json = "{\"sessions\":5}";
         ((FakeStorage) storage).setInputData(json);
@@ -57,7 +58,7 @@ class ConfigHandlerTest {
     }
 
     @Test
-    void testReadThrowsIOExceptionWhenStorageThrows() throws IOException {
+    void testReadThrowsIOExceptionWhenStorageThrows() throws IOException, JsonSyntaxException {
         // Arrange: Simulate input failure
         ((FakeStorage) storage).setThrowOnIn(true);
 
@@ -100,17 +101,15 @@ class ConfigHandlerTest {
 
         @Override
         public InputStream in() throws IOException {
-            if (throwOnIn) {
+            if (throwOnIn)
                 throw new IOException("Simulated input error");
-            }
             return new ByteArrayInputStream(inputData.getBytes(StandardCharsets.UTF_8));
         }
 
         @Override
         public OutputStream out() throws IOException {
-            if (throwOnOut) {
+            if (throwOnOut)
                 throw new IOException("Simulated output error");
-            }
             return new OutputStream() {
                 @Override
                 public void write(int b) throws IOException {
