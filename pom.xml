@@ -13,6 +13,7 @@
             <artifactId>javafx-controls</artifactId>
             <version>13</version>
         </dependency>
+        <!-- AI-generated: JUnit 5 dependency for testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
