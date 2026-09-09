@@ -8,6 +8,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
 
 /**
  * (De)serializes user configuration data from/to JSON storage.
@@ -19,11 +20,10 @@ public class ConfigHandler {
     this.storage = storage;
   }
 
-  public ConfigData read() throws IOException {
+  public ConfigData read() throws IOException, JsonSyntaxException {
     Gson gson = new Gson();
     try (InputStream in = storage.in();
         var reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
-      // TODO: Handle parsing error
       return gson.fromJson(reader, ConfigData.class);
     }
   }
