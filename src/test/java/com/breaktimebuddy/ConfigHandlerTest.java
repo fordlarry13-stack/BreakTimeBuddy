@@ -76,6 +76,16 @@ class ConfigHandlerTest {
         assertThrows(IOException.class, () -> handler.write(data));
     }
 
+    @Test
+    void testReadThrowsJsonSyntaxExceptionWhenInvalidJson() throws IOException {
+        // Arrange: storage provides invalid JSON
+        String invalidJson = "{ invalid json }";
+        ((FakeStorage) storage).setInputData(invalidJson);
+
+        // Act & Assert
+        assertThrows(JsonSyntaxException.class, () -> handler.read());
+    }
+
     /** A simple fake Storage for testing. */
     private static class FakeStorage implements Storage {
         private String inputData;
