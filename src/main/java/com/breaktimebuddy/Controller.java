@@ -1,5 +1,6 @@
 package com.breaktimebuddy;
 
+import java.io.File;
 import java.util.function.Consumer;
 import javafx.scene.layout.Region;
 
@@ -10,7 +11,7 @@ public class Controller {
 
   public Controller() {
     ViewModel model = new ViewModel();
-    interactor = new Interactor(model);
+    interactor = new Interactor(model, new ConfigHandler(new FileStorage(new File("config.json"))));
     viewBuilder = new ViewBuilder(model, this::toggleSession, this::saveConfig, this::loadConfig);
   }
 
