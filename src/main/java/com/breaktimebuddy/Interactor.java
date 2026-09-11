@@ -1,17 +1,19 @@
 package com.breaktimebuddy;
 
-import java.io.File;
 import java.io.IOException;
 import com.google.gson.JsonSyntaxException;
 
 // TODO: Rename
 public class Interactor {
   private final ViewModel viewModel;
+  private final ConfigHandler configHandler;
+
   private boolean inSession;
   private int sessions;
 
-  public Interactor(ViewModel model) {
+  public Interactor(ViewModel model, ConfigHandler configHandler) {
     this.viewModel = model;
+    this.configHandler = configHandler;
   }
 
   public void updateModel() {
@@ -24,8 +26,6 @@ public class Interactor {
       sessions++;
     inSession = !inSession;
   }
-
-  private ConfigHandler configHandler = new ConfigHandler(new FileStorage(new File("config.json")));
 
   public void saveConfig() throws IOException {
     ConfigData data = new ConfigData(sessions);
