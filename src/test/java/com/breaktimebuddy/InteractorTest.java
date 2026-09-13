@@ -9,37 +9,39 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.google.gson.JsonSyntaxException;
 
 class InteractorTest {
-    private ViewModel viewModel;
+    private StateChangeCaptor stateChangeCaptor;
     private FakeConfigHandler configHandler;
     private Interactor interactor;
 
     @BeforeEach
     void setUp() {
-        viewModel = new ViewModel();
+        stateChangeCaptor = new StateChangeCaptor();
         configHandler = new FakeConfigHandler();
-        interactor = new Interactor(viewModel, configHandler);
+        interactor = new Interactor(stateChangeCaptor, configHandler);
     }
 
     @Test
     void testInitialState() {
         // Initially not in session
-        assertFalse(viewModel.getInSession());
-        assertEquals(0, viewModel.getSessions());
+        State state = stateChangeCaptor.lastState;
+        assertFalse(state.inSession());
+        assertEquals(0, state.sessions());
     }
 
     @Test
     void testToggleSessionStartsSession() {
         // Toggle to start session
         interactor.toggleSession();
-        interactor.updateModel();
         // Should now be in session, sessions count unchanged (still 0)
-        assertTrue(viewModel.getInSession());
-        assertEquals(0, viewModel.getSessions());
+        State state = stateChangeCaptor.lastState;
+        assertTrue(state.inSession());
+        assertEquals(0, state.sessions());
     }
 
     @Test
@@ -47,10 +49,10 @@ class InteractorTest {
         interactor.toggleSession();
         // End the session (toggleSession when in session)
         interactor.toggleSession();
-        interactor.updateModel();
         // Sessions incremented when ending
-        assertFalse(viewModel.getInSession());
-        assertEquals(1, viewModel.getSessions());
+        State state = stateChangeCaptor.lastState;
+        assertFalse(state.inSession());
+        assertEquals(1, state.sessions());
     }
 
     @Test
@@ -68,8 +70,8 @@ class InteractorTest {
     void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonSyntaxException {
         configHandler.setDataToReturn(new ConfigData(7));
         interactor.loadConfig();
-        interactor.updateModel();
-        assertEquals(7, viewModel.getSessions());
+        State state = stateChangeCaptor.lastState;
+        assertEquals(7, state.sessions());
     }
 
     @Test
@@ -88,6 +90,15 @@ class InteractorTest {
     void testLoadConfigThrowsJsonSyntaxExceptionWhenConfigHandlerThrowsJsonSyntaxException() {
         configHandler.setThrowOnReadJsonSyntaxException(true);
         assertThrows(JsonSyntaxException.class, () -> interactor.loadConfig());
+    }
+
+    private static class StateChangeCaptor implements Consumer<State> {
+        private State lastState;
+
+        @Override
+        public void accept(State state) {
+            lastState = state;
+        }
     }
 
     /** A fake ConfigHandler for testing Interactor in isolation. */
