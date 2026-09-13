@@ -1,30 +1,34 @@
 package com.breaktimebuddy;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 import com.google.gson.JsonSyntaxException;
 
 // TODO: Rename
 public class Interactor {
-  private final ViewModel viewModel;
+  private final Consumer<State> stateChangeListener;
   private final ConfigHandler configHandler;
 
   private boolean inSession;
   private int sessions;
 
-  public Interactor(ViewModel model, ConfigHandler configHandler) {
-    this.viewModel = model;
+  public Interactor(Consumer<State> stateChangeListener, ConfigHandler configHandler) {
+    this.stateChangeListener = stateChangeListener;
+    notifyStateChange();
     this.configHandler = configHandler;
   }
 
-  public void updateModel() {
-    viewModel.setInSession(inSession);
-    viewModel.setSessions(sessions);
+  private void notifyStateChange() {
+    if (stateChangeListener == null)
+      return;
+    stateChangeListener.accept(new State(inSession, sessions));
   }
 
   public void toggleSession() {
     if (inSession)
       sessions++;
     inSession = !inSession;
+    notifyStateChange();
   }
 
   public void saveConfig() throws IOException {
@@ -35,5 +39,6 @@ public class Interactor {
   public void loadConfig() throws IOException, JsonSyntaxException {
     ConfigData data = configHandler.read();
     sessions = data.sessions();
+    notifyStateChange();
   }
 }
