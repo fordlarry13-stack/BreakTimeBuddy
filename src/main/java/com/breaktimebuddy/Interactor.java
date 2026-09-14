@@ -14,7 +14,7 @@ public class Interactor {
 
   public Interactor(Consumer<State> stateChangeListener, ConfigHandler configHandler) {
     this.stateChangeListener = stateChangeListener;
-    notifyStateChange();
+    spreadConfigData(ConfigData.getDefault());
     this.configHandler = configHandler;
   }
 
@@ -37,7 +37,10 @@ public class Interactor {
   }
 
   public void loadConfig() throws IOException, JsonSyntaxException {
-    ConfigData data = configHandler.read();
+    spreadConfigData(configHandler.read());
+  }
+
+  private void spreadConfigData(ConfigData data) {
     sessions = data.sessions();
     notifyStateChange();
   }

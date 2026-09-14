@@ -24,7 +24,7 @@ public class ConfigHandler {
     Gson gson = new Gson();
     try (InputStream in = storage.in();
         var reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
-      return ConfigData.withDefaults(gson.fromJson(reader, ConfigData.class));
+      return ConfigData.sanitize(gson.fromJson(reader, ConfigData.class));
     }
   }
 
