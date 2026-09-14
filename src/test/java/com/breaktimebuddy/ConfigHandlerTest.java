@@ -51,6 +51,23 @@ class ConfigHandlerTest {
 
         // Assert: every value is recursively filled with defaults
         assertNotNull(data);
+        assertEquals(ConfigData.getDefault(), data);
+    }
+
+    /**
+     * This tests that the data is sanitized at all. See {@link ConfigDataTest} for more
+     * sanitization tests.
+     */
+    @Test
+    void testReadReturnsSanitizedConfigData() throws IOException, JsonSyntaxException {
+        // Arrange: storage provides valid JSON but with invalid data
+        storage.setInputData("{sessions:-1}");
+
+        // Act
+        ConfigData data = handler.read();
+
+        // Assert: every value is recursively filled with defaults
+        assertNotNull(data);
         assertEquals(0, data.sessions());
     }
 
