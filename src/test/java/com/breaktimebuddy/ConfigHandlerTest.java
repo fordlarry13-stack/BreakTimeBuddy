@@ -18,7 +18,7 @@ import com.google.gson.JsonSyntaxException;
 
 class ConfigHandlerTest {
 
-    private Storage storage;
+    private FakeStorage storage;
     private ConfigHandler handler;
 
     @BeforeEach
@@ -31,7 +31,7 @@ class ConfigHandlerTest {
     void testReadReturnsConfigData() throws IOException, JsonSyntaxException {
         // Arrange: storage provides valid JSON for ConfigData with sessions = 5
         String json = "{\"sessions\":5}";
-        ((FakeStorage) storage).setInputData(json);
+        storage.setInputData(json);
 
         // Act
         ConfigData data = handler.read();
@@ -42,11 +42,41 @@ class ConfigHandlerTest {
     }
 
     @Test
+    void testReadReturnsConfigDataWithDefaults() throws IOException, JsonSyntaxException {
+        // Arrange: storage provides empty JSON, which becomes null
+        storage.setInputData("");
+
+        // Act
+        ConfigData data = handler.read();
+
+        // Assert: every value is recursively filled with defaults
+        assertNotNull(data);
+        assertEquals(ConfigData.getDefault(), data);
+    }
+
+    /**
+     * This tests that the data is sanitized at all. See {@link ConfigDataTest} for more
+     * sanitization tests.
+     */
+    @Test
+    void testReadReturnsSanitizedConfigData() throws IOException, JsonSyntaxException {
+        // Arrange: storage provides valid JSON but with invalid data
+        storage.setInputData("{sessions:-1}");
+
+        // Act
+        ConfigData data = handler.read();
+
+        // Assert: every value is recursively filled with defaults
+        assertNotNull(data);
+        assertEquals(0, data.sessions());
+    }
+
+    @Test
     void testWriteWritesJson() throws IOException {
         // Arrange
         ConfigData data = new ConfigData(10);
         ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
-        ((FakeStorage) storage).setOutputCaptor(outBytes);
+        storage.setOutputCaptor(outBytes);
 
         // Act
         handler.write(data);
@@ -60,7 +90,7 @@ class ConfigHandlerTest {
     @Test
     void testReadThrowsIOExceptionWhenStorageThrows() throws IOException, JsonSyntaxException {
         // Arrange: Simulate input failure
-        ((FakeStorage) storage).setThrowOnIn(true);
+        storage.setThrowOnIn(true);
 
         // Act & Assert
         assertThrows(IOException.class, () -> handler.read());
@@ -69,7 +99,7 @@ class ConfigHandlerTest {
     @Test
     void testWriteThrowsIOExceptionWhenStorageThrows() throws IOException {
         // Arrange: Simulate output failure
-        ((FakeStorage) storage).setThrowOnOut(true);
+        storage.setThrowOnOut(true);
         ConfigData data = new ConfigData(1);
 
         // Act & Assert
@@ -80,7 +110,7 @@ class ConfigHandlerTest {
     void testReadThrowsJsonSyntaxExceptionWhenInvalidJson() throws IOException {
         // Arrange: storage provides invalid JSON
         String invalidJson = "{ invalid json }";
-        ((FakeStorage) storage).setInputData(invalidJson);
+        storage.setInputData(invalidJson);
 
         // Act & Assert
         assertThrows(JsonSyntaxException.class, () -> handler.read());
