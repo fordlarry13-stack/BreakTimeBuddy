@@ -35,9 +35,9 @@ class InteractorTest {
     }
 
     @Test
-    void testToggleSessionStartsSession() {
+    void testSwitchWorkBreakStartsSession() {
         // Toggle to start session
-        interactor.toggleSession();
+        interactor.switchWorkBreak();
         // Should now be in session, sessions count unchanged (still 0)
         State state = stateChangeCaptor.lastState;
         assertTrue(state.inSession());
@@ -45,10 +45,10 @@ class InteractorTest {
     }
 
     @Test
-    void testToggleSessionEndsSessionIncrementsCount() {
-        interactor.toggleSession();
-        // End the session (toggleSession when in session)
-        interactor.toggleSession();
+    void testSwitchWorkBreakEndsSessionIncrementsCount() {
+        interactor.switchWorkBreak();
+        // End the session (switchWorkBreak when in session)
+        interactor.switchWorkBreak();
         // Sessions incremented when ending
         State state = stateChangeCaptor.lastState;
         assertFalse(state.inSession());
@@ -59,7 +59,7 @@ class InteractorTest {
     void testSaveConfigCallsConfigHandlerWrite() throws IOException {
         // Set up state: end 3 sessions
         for (int i = 0; i < 6; i++)
-            interactor.toggleSession();
+            interactor.switchWorkBreak();
         interactor.saveConfig();
         ConfigData data = configHandler.getLastDataWritten();
         assertNotNull(data);

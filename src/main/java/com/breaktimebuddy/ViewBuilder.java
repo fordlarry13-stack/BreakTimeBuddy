@@ -10,18 +10,18 @@ import javafx.util.Builder;
 // TODO: Rename
 public class ViewBuilder implements Builder<Region> {
   private final ViewModel viewModel;
-  private final Runnable toggleSession;
+  private final Runnable switchWorkBreak;
   private final Runnable saveConfig;
   private final Runnable loadConfig;
   private final Runnable requestBreakRecommendationNow;
   private final Runnable acceptBreakRecommendation;
   private final Runnable rejectBreakRecommendation;
 
-  public ViewBuilder(ViewModel model, Runnable toggleSession, Runnable saveConfig,
+  public ViewBuilder(ViewModel model, Runnable switchWorkBreak, Runnable saveConfig,
       Runnable loadConfig, Runnable requestBreakRecommendationNow,
       Runnable acceptBreakRecommendation, Runnable rejectBreakRecommendation) {
     this.viewModel = model;
-    this.toggleSession = toggleSession;
+    this.switchWorkBreak = switchWorkBreak;
     this.saveConfig = saveConfig;
     this.loadConfig = loadConfig;
     this.requestBreakRecommendationNow = requestBreakRecommendationNow;
@@ -33,7 +33,7 @@ public class ViewBuilder implements Builder<Region> {
   public Region build() {
     Label sampleLabel = new Label("Break Time Buddy - Project Started");
     Button sessionToggleButton = new Button();
-    sessionToggleButton.setOnAction(e -> toggleSession.run());
+    sessionToggleButton.setOnAction(e -> switchWorkBreak.run());
     sessionToggleButton.textProperty().bind(viewModel.sessionStatusTextProperty());
     Label sessionsLabel = new Label();
     sessionsLabel.textProperty().bind(viewModel.sessionsProperty().asString("Sessions: %d"));

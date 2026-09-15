@@ -14,13 +14,13 @@ public class Controller {
     viewModel = new ViewModel();
     interactor =
         new Interactor(state -> Platform.runLater(() -> updateModel(state)), configHandler);
-    viewBuilder = new ViewBuilder(viewModel, this::toggleSession, this::saveConfig,
+    viewBuilder = new ViewBuilder(viewModel, this::switchWorkBreak, this::saveConfig,
         this::loadConfig, this::requestBreakRecommendationNow, this::acceptBreakRecommendation,
         this::rejectBreakRecommendation);
   }
 
-  private void toggleSession() {
-    interactor.toggleSession();
+  private void switchWorkBreak() {
+    interactor.switchWorkBreak();
   }
 
   private void requestBreakRecommendationNow() {

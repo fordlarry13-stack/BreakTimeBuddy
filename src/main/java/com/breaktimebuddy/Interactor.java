@@ -47,7 +47,7 @@ public class Interactor {
             : new DialogState(breakRecommendationState.id(), breakRecommendationState.message())));
   }
 
-  public void toggleSession() {
+  public void switchWorkBreak() {
     if (inSession)
       sessions++;
     setInSession(!inSession);
@@ -103,7 +103,7 @@ public class Interactor {
       if (state == null || !state.id().equals(messageId))
         return state;
       if (inSession)
-        toggleSession();
+        switchWorkBreak();
       return null;
     });
     notifyStateChange();
