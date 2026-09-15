@@ -1,16 +1,28 @@
 package com.breaktimebuddy;
 
 import java.io.IOException;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import com.google.gson.JsonSyntaxException;
 
 // TODO: Rename
 public class Interactor {
+  private record BreakRecommendationState(UUID id, String message) {
+  }
+
   private final Consumer<State> stateChangeListener;
   private final ConfigHandler configHandler;
 
   private boolean inSession;
   private int sessions;
+  private AtomicBoolean breakRecommendationRequested = new AtomicBoolean();
+  private CompletableFuture<String> currentBreakRecommendationFuture;
+  private AtomicReference<BreakRecommendationState> breakRecommendationState =
+      new AtomicReference<>();
 
   public Interactor(Consumer<State> stateChangeListener, ConfigHandler configHandler) {
     this.stateChangeListener = stateChangeListener;
@@ -18,16 +30,27 @@ public class Interactor {
     this.configHandler = configHandler;
   }
 
+  private void setInSession(boolean inSession) {
+    this.inSession = inSession;
+    if (!inSession) {
+      clearAndCancelBreakRecommendationRequest(currentBreakRecommendationFuture);
+      breakRecommendationState.set(null);
+    }
+  }
+
   private void notifyStateChange() {
     if (stateChangeListener == null)
       return;
-    stateChangeListener.accept(new State(inSession, sessions));
+    BreakRecommendationState breakRecommendationState = this.breakRecommendationState.get();
+    stateChangeListener.accept(new State(inSession, sessions, breakRecommendationRequested.get(),
+        breakRecommendationState == null ? null
+            : new DialogState(breakRecommendationState.id(), breakRecommendationState.message())));
   }
 
-  public void toggleSession() {
+  public void switchWorkBreak() {
     if (inSession)
       sessions++;
-    inSession = !inSession;
+    setInSession(!inSession);
     notifyStateChange();
   }
 
@@ -42,6 +65,56 @@ public class Interactor {
 
   private void spreadConfigData(ConfigData data) {
     sessions = data.sessions();
+    notifyStateChange();
+  }
+
+  private void clearAndCancelBreakRecommendationRequest(CompletableFuture<String> future) {
+    if (future != null && future == currentBreakRecommendationFuture) {
+      breakRecommendationRequested.set(false);
+      currentBreakRecommendationFuture = null;
+      future.cancel(true);
+    }
+  }
+
+  private void requestBreakRecommendation() {
+    if (!inSession)
+      return;
+    if (!breakRecommendationRequested.compareAndSet(false, true))
+      return;
+    // TODO: Replace with an actual RecommendationService call
+    currentBreakRecommendationFuture = CompletableFuture.runAsync(() -> {
+    }, CompletableFuture.delayedExecutor(2, TimeUnit.SECONDS))
+        .thenApply(_0 -> "Test recommendation message");
+    currentBreakRecommendationFuture.thenAccept(message -> breakRecommendationState
+        .set(new BreakRecommendationState(UUID.randomUUID(), message)));
+    currentBreakRecommendationFuture.whenComplete((_0, _1) -> {
+      clearAndCancelBreakRecommendationRequest(currentBreakRecommendationFuture);
+      notifyStateChange();
+    });
+    notifyStateChange();
+  }
+
+  public void requestBreakRecommendationNow() {
+    requestBreakRecommendation();
+  }
+
+  public void acceptBreakRecommendation(UUID messageId) {
+    breakRecommendationState.updateAndGet(state -> {
+      if (state == null || !state.id().equals(messageId))
+        return state;
+      if (inSession)
+        switchWorkBreak();
+      return null;
+    });
+    notifyStateChange();
+  }
+
+  public void rejectBreakRecommendation(UUID messageId) {
+    breakRecommendationState.updateAndGet(state -> {
+      if (state == null || !state.id().equals(messageId))
+        return state;
+      return null;
+    });
     notifyStateChange();
   }
 }

@@ -1,5 +1,6 @@
 package com.breaktimebuddy;
 
 /** Public inner state snapshot */
-public record State(boolean inSession, int sessions) {
+public record State(boolean inSession, int sessions, boolean breakRecommendationRequested,
+        DialogState dialogState) {
 }
