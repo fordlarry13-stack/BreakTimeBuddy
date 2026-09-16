@@ -104,7 +104,7 @@ mvn clean test
 During Alpha development, the verified result was:
 
 ```text
-Tests run: 12
+Tests run: 34
 Failures: 0
 Errors: 0
 Skipped: 0
@@ -122,6 +122,9 @@ The AI-related automated tests cover:
 - Network failure retry behavior.
 - HTTP 401 no-retry behavior.
 - Rule-based fallback recommendations.
+- Recommendation service invocation from the session flow.
+- Successful recommendation updates to the existing dialog state.
+- Failed and stale asynchronous recommendation handling.
 
 The Groq unit tests use an injected fake HTTP client. Therefore, automated tests and CI do not require a real Groq API key or a live network request.
 
@@ -236,5 +239,10 @@ The AI recommendation module currently provides:
 - Rule-based fallback recommendations.
 - Automated unit tests.
 - Manual live API verification.
+- Integration with the JavaFX session and recommendation-dialog flow.
 
-The remaining integration work is to connect the recommendation service with the application's session flow and display the resulting recommendation in the JavaFX user interface.
+The recommendation service is connected to the application's session flow. Recommendation
+requests are handled asynchronously and successful results are published through the existing
+`DialogState` and `DialogDisplay` lifecycle. A recommendation displayed in the JavaFX interface
+may come from Groq or from `FallbackRecommendationService`, depending on provider availability,
+response validity, and retry outcomes.
