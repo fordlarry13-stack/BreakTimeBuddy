@@ -18,7 +18,7 @@ public class GroqRecommendationService implements RecommendationService {
             "https://api.groq.com/openai/v1/chat/completions";
 
     private static final String MODEL =
-            "qwen/qwen3.8";
+            "qwen/qwen3.8-27b";
 
     private static final int MAX_ATTEMPTS = 3;
     private static final int RETRY_DELAY_SECONDS = 1;

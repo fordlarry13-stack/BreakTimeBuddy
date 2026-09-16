@@ -8,7 +8,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -80,18 +79,7 @@ class GroqRecommendationServiceTest {
 
     @Test
     void usesFallbackWhenRecommendationIsTooLong() {
-        String longRecommendation = String.join(
-                " ",
-                List.of(
-                        "one", "two", "three", "four", "five",
-                        "six", "seven", "eight", "nine", "ten",
-                        "eleven", "twelve", "thirteen", "fourteen", "fifteen",
-                        "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
-                        "twentyone", "twentytwo", "twentythree", "twentyfour",
-                        "twentyfive", "twentysix", "twentyseven", "twentyeight",
-                        "twentynine", "thirty", "thirtyone"
-                )
-        );
+        String longRecommendation = "word ".repeat(31).trim();
 
         String body = """
                 {
