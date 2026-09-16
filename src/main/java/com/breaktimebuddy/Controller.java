@@ -11,9 +11,14 @@ public class Controller {
   private final ViewBuilder viewBuilder;
 
   public Controller(ConfigHandler configHandler) {
+    this(configHandler, new GroqRecommendationService());
+  }
+
+  Controller(ConfigHandler configHandler, RecommendationService recommendationService) {
     viewModel = new ViewModel();
     interactor =
-        new Interactor(state -> Platform.runLater(() -> updateModel(state)), configHandler);
+        new Interactor(state -> Platform.runLater(() -> updateModel(state)), configHandler,
+            recommendationService);
     viewBuilder = new ViewBuilder(viewModel, this::switchWorkBreak, this::saveConfig,
         this::loadConfig, this::requestBreakRecommendationNow, this::acceptBreakRecommendation,
         this::rejectBreakRecommendation);

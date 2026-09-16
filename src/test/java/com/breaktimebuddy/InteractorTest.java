@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,13 +18,15 @@ import com.google.gson.JsonSyntaxException;
 class InteractorTest {
     private StateChangeCaptor stateChangeCaptor;
     private FakeConfigHandler configHandler;
+    private FakeRecommendationService recommendationService;
     private Interactor interactor;
 
     @BeforeEach
     void setUp() {
         stateChangeCaptor = new StateChangeCaptor();
         configHandler = new FakeConfigHandler();
-        interactor = new Interactor(stateChangeCaptor, configHandler);
+        recommendationService = new FakeRecommendationService();
+        interactor = new Interactor(stateChangeCaptor, configHandler, recommendationService);
     }
 
     @Test
@@ -92,12 +95,77 @@ class InteractorTest {
         assertThrows(JsonSyntaxException.class, () -> interactor.loadConfig());
     }
 
+    @Test
+    void testRecommendationRequestInvokesServiceAndDisplaysResult() {
+        interactor.switchWorkBreak();
+
+        interactor.requestBreakRecommendationNow();
+
+        assertEquals(1, recommendationService.callCount);
+        assertEquals(0, recommendationService.lastRequest.sessions());
+        assertTrue(stateChangeCaptor.lastState.breakRecommendationRequested());
+
+        recommendationService.future.complete("Take a short walk and stretch.");
+
+        State state = stateChangeCaptor.lastState;
+        assertFalse(state.breakRecommendationRequested());
+        assertNotNull(state.dialogState());
+        assertEquals("Take a short walk and stretch.", state.dialogState().message());
+    }
+
+    @Test
+    void testRecommendationFailureClearsRequestWithoutOpeningDialog() {
+        interactor.switchWorkBreak();
+        interactor.requestBreakRecommendationNow();
+
+        recommendationService.future.completeExceptionally(new RuntimeException("Simulated error"));
+
+        State state = stateChangeCaptor.lastState;
+        assertFalse(state.breakRecommendationRequested());
+        assertNull(state.dialogState());
+    }
+
+    @Test
+    void testStaleRecommendationDoesNotReopenDialogAfterManualSwitch() {
+        recommendationService.future = new NonCancellableFuture();
+        interactor.switchWorkBreak();
+        interactor.requestBreakRecommendationNow();
+
+        interactor.switchWorkBreak();
+        recommendationService.future.complete("Stale recommendation");
+
+        State state = stateChangeCaptor.lastState;
+        assertFalse(state.inSession());
+        assertFalse(state.breakRecommendationRequested());
+        assertNull(state.dialogState());
+    }
+
     private static class StateChangeCaptor implements Consumer<State> {
         private State lastState;
 
         @Override
         public void accept(State state) {
             lastState = state;
+        }
+    }
+
+    private static class FakeRecommendationService implements RecommendationService {
+        private int callCount;
+        private RecommendationRequest lastRequest;
+        private CompletableFuture<String> future = new CompletableFuture<>();
+
+        @Override
+        public CompletableFuture<String> getRecommendation(RecommendationRequest request) {
+            callCount++;
+            lastRequest = request;
+            return future;
+        }
+    }
+
+    private static class NonCancellableFuture extends CompletableFuture<String> {
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return false;
         }
     }
 

@@ -3,7 +3,6 @@ package com.breaktimebuddy;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -16,6 +15,7 @@ public class Interactor {
 
   private final Consumer<State> stateChangeListener;
   private final ConfigHandler configHandler;
+  private final RecommendationService recommendationService;
 
   private boolean inSession;
   private int sessions;
@@ -24,10 +24,12 @@ public class Interactor {
   private AtomicReference<BreakRecommendationState> breakRecommendationState =
       new AtomicReference<>();
 
-  public Interactor(Consumer<State> stateChangeListener, ConfigHandler configHandler) {
+  public Interactor(Consumer<State> stateChangeListener, ConfigHandler configHandler,
+      RecommendationService recommendationService) {
     this.stateChangeListener = stateChangeListener;
     spreadConfigData(ConfigData.getDefault());
     this.configHandler = configHandler;
+    this.recommendationService = recommendationService;
   }
 
   private void setInSession(boolean inSession) {
@@ -81,14 +83,15 @@ public class Interactor {
       return;
     if (!breakRecommendationRequested.compareAndSet(false, true))
       return;
-    // TODO: Replace with an actual RecommendationService call
-    currentBreakRecommendationFuture = CompletableFuture.runAsync(() -> {
-    }, CompletableFuture.delayedExecutor(2, TimeUnit.SECONDS))
-        .thenApply(_0 -> "Test recommendation message");
-    currentBreakRecommendationFuture.thenAccept(message -> breakRecommendationState
-        .set(new BreakRecommendationState(UUID.randomUUID(), message)));
-    currentBreakRecommendationFuture.whenComplete((_0, _1) -> {
-      clearAndCancelBreakRecommendationRequest(currentBreakRecommendationFuture);
+    CompletableFuture<String> future = recommendationService
+        .getRecommendation(new RecommendationRequest(sessions));
+    currentBreakRecommendationFuture = future;
+    future.whenComplete((message, error) -> {
+      if (future != currentBreakRecommendationFuture)
+        return;
+      if (error == null && inSession)
+        breakRecommendationState.set(new BreakRecommendationState(UUID.randomUUID(), message));
+      clearAndCancelBreakRecommendationRequest(future);
       notifyStateChange();
     });
     notifyStateChange();
