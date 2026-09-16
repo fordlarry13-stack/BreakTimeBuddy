@@ -41,7 +41,7 @@ Rule-based break recommendation
 The Alpha implementation uses Groq with the following model:
 
 ```text
-qwen/qwen3.6-27b
+qwen/qwen3.8
 ```
 
 The Groq API key is read from the `GROQ_API_KEY` environment variable.
