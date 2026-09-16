@@ -1,113 +1,74 @@
 package com.breaktimebuddy;
 
-import javafx.beans.binding.Bindings;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
-import javafx.util.Builder;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.StringProperty;
+import javafx.beans.property.SimpleStringProperty;
 
-public class ViewBuilder implements Builder<Region> {
+public class ViewModel {
 
-    private final ViewModel viewModel;
-    private final Runnable toggleSession;
-    private final Runnable saveConfig;
-    private final Runnable loadConfig;
-
-    public ViewBuilder(ViewModel model,
-                       Runnable toggleSession,
-                       Runnable saveConfig,
-                       Runnable loadConfig) {
-
-        this.viewModel = model;
-        this.toggleSession = toggleSession;
-        this.saveConfig = saveConfig;
-        this.loadConfig = loadConfig;
+    // --- SESSION COUNT ---
+    private final IntegerProperty sessions = new SimpleIntegerProperty(0);
+    public IntegerProperty sessionsProperty() {
+        return sessions;
     }
 
-    @Override
-    public Region build() {
+    // --- CONFIG FEEDBACK ---
+    private final StringProperty configFeedbackMessage = new SimpleStringProperty("");
+    private final StringProperty configFeedbackTimestamp = new SimpleStringProperty("");
 
-        VBox root = new VBox(30);
-        root.setStyle("-fx-background-color: #111; -fx-padding: 40;");
+    public String getConfigFeedbackMessage() {
+        return configFeedbackMessage.get();
+    }
 
-        // --- TITLE ---
-        Label title = new Label("Break Time Buddy");
-        title.setStyle("-fx-text-fill: white; -fx-font-size: 28px; -fx-font-weight: bold;");
+    public StringProperty configFeedbackMessageProperty() {
+        return configFeedbackMessage;
+    }
 
-        // --- SESSION COUNTER ---
-        Label sessionsLabel = new Label();
-        sessionsLabel.textProperty().bind(viewModel.sessionsProperty().asString("Sessions: %d"));
+    public String getConfigFeedbackTimestamp() {
+        return configFeedbackTimestamp.get();
+    }
 
-        // --- CONFIG BUTTONS ---
-        Button saveConfigButton = new Button("Save config");
-        saveConfigButton.setOnAction(e -> saveConfig.run());
+    public StringProperty configFeedbackTimestampProperty() {
+        return configFeedbackTimestamp;
+    }
 
-        Button loadConfigButton = new Button("Load config");
-        loadConfigButton.setOnAction(e -> loadConfig.run());
+    public void setConfigFeedback(String timestamp, String message) {
+        configFeedbackTimestamp.set(timestamp);
+        configFeedbackMessage.set(message);
+    }
 
-        Label configFeedbackLabel = new Label();
-        configFeedbackLabel.textProperty().bind(
-                Bindings.createStringBinding(
-                        () -> viewModel.getConfigFeedbackMessage() == null
-                                ? ""
-                                : "[%s] %s".formatted(
-                                        viewModel.getConfigFeedbackTimestamp(),
-                                        viewModel.getConfigFeedbackMessage()
-                                ),
-                        viewModel.configFeedbackTimestampProperty(),
-                        viewModel.configFeedbackMessageProperty()
-                )
-        );
+    // --- SESSION ACTIVE FLAG ---
+    private final BooleanProperty sessionActive = new SimpleBooleanProperty(false);
 
-        // --- CONDITIONAL VIEW SWITCHING ---
-        if (viewModel.isSessionActive()) {
+    public boolean isSessionActive() {
+        return sessionActive.get();
+    }
 
-            // SESSION VIEW
-            Button breakButton = new Button("Take Break");
-            breakButton.setStyle("-fx-background-color: white; -fx-text-fill: black;");
-            breakButton.setOnAction(e -> viewModel.takeBreak());
+    public BooleanProperty sessionActiveProperty() {
+        return sessionActive;
+    }
 
-            Button endButton = new Button("End Session");
-            endButton.setStyle("-fx-background-color: white; -fx-text-fill: black;");
-            endButton.setOnAction(e -> toggleSession.run());
+    public void toggleSession() {
+        sessionActive.set(!sessionActive.get());
+    }
 
-            Label recTitle = new Label("AI Recommendation:");
-            recTitle.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
+    // --- TAKE BREAK (placeholder) ---
+    public void takeBreak() {
+        // TODO: implement break logic later
+        sessions.set(sessions.get() + 1);
+    }
 
-            Label recommendationLabel = new Label("(No recommendation yet)");
-            recommendationLabel.setStyle("-fx-text-fill: #ccc; -fx-font-size: 16px;");
-            recommendationLabel.textProperty().bind(viewModel.aiRecommendationProperty());
+    // --- AI RECOMMENDATION ---
+    private final StringProperty aiRecommendation = new SimpleStringProperty("");
 
-            root.getChildren().addAll(
-                    title,
-                    breakButton,
-                    endButton,
-                    recTitle,
-                    recommendationLabel,
-                    sessionsLabel,
-                    saveConfigButton,
-                    loadConfigButton,
-                    configFeedbackLabel
-            );
+    public StringProperty aiRecommendationProperty() {
+        return aiRecommendation;
+    }
 
-        } else {
-
-            // MAIN VIEW
-            Button startButton = new Button("Start Session");
-            startButton.setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-font-size: 16px;");
-            startButton.setOnAction(e -> toggleSession.run());
-
-            root.getChildren().addAll(
-                    title,
-                    startButton,
-                    sessionsLabel,
-                    saveConfigButton,
-                    loadConfigButton,
-                    configFeedbackLabel
-            );
-        }
-
-        return root;
+    public void setAiRecommendation(String value) {
+        aiRecommendation.set(value);
     }
 }
