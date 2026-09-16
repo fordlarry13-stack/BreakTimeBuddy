@@ -31,7 +31,8 @@ public class ViewBuilder implements Builder<Region> {
 
   @Override
   public Region build() {
-    Label sampleLabel = new Label("Break Time Buddy - Project Started");
+    VBox root = new VBox(20);
+    Label title = new Label("Break Time Buddy");
     Button sessionToggleButton = new Button();
     sessionToggleButton.setOnAction(e -> switchWorkBreak.run());
     sessionToggleButton.textProperty().bind(viewModel.sessionStatusTextProperty());
@@ -58,8 +59,9 @@ public class ViewBuilder implements Builder<Region> {
     saveConfigButton.setOnAction(e -> saveConfig.run());
     Button loadConfigButton = new Button("Load config");
     loadConfigButton.setOnAction(e -> loadConfig.run());
-    return new VBox(sampleLabel, sessionToggleButton, sessionsLabel,
+    root.getChildren().addAll(title, sessionToggleButton, sessionsLabel,
         breakRecommendationRequestedLabel, requestBreakRecommendationNowButton, dialogDisplay,
         saveConfigButton, loadConfigButton, configFeedbackLabel);
+    return root;
   }
 }
