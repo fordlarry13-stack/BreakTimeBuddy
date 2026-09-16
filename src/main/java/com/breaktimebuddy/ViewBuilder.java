@@ -28,16 +28,16 @@ public class ViewBuilder implements Builder<Region> {
     @Override
     public Region build() {
 
-        VBox root = new VBox(30);
-        root.setStyle("-fx-background-color: #111; -fx-padding: 40;");
+        VBox root = new VBox(20);
 
         // --- TITLE ---
         Label title = new Label("Break Time Buddy");
-        title.setStyle("-fx-text-fill: white; -fx-font-size: 28px; -fx-font-weight: bold;");
 
         // --- SESSION COUNTER ---
         Label sessionsLabel = new Label();
-        sessionsLabel.textProperty().bind(viewModel.sessionsProperty().asString("Sessions: %d"));
+        sessionsLabel.textProperty().bind(
+                viewModel.sessionsProperty().asString("Sessions: %d")
+        );
 
         // --- CONFIG BUTTONS ---
         Button saveConfigButton = new Button("Save config");
@@ -63,20 +63,15 @@ public class ViewBuilder implements Builder<Region> {
         // --- CONDITIONAL VIEW SWITCHING ---
         if (viewModel.isSessionActive()) {
 
-            // SESSION VIEW
+            // SESSION VIEW (visual order)
             Button breakButton = new Button("Take Break");
-            breakButton.setStyle("-fx-background-color: white; -fx-text-fill: black;");
             breakButton.setOnAction(e -> viewModel.takeBreak());
 
             Button endButton = new Button("End Session");
-            endButton.setStyle("-fx-background-color: white; -fx-text-fill: black;");
             endButton.setOnAction(e -> toggleSession.run());
 
             Label recTitle = new Label("AI Recommendation:");
-            recTitle.setStyle("-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;");
-
-            Label recommendationLabel = new Label("(No recommendation yet)");
-            recommendationLabel.setStyle("-fx-text-fill: #ccc; -fx-font-size: 16px;");
+            Label recommendationLabel = new Label();
             recommendationLabel.textProperty().bind(viewModel.aiRecommendationProperty());
 
             root.getChildren().addAll(
@@ -93,9 +88,8 @@ public class ViewBuilder implements Builder<Region> {
 
         } else {
 
-            // MAIN VIEW
+            // MAIN VIEW (visual order)
             Button startButton = new Button("Start Session");
-            startButton.setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-font-size: 16px;");
             startButton.setOnAction(e -> toggleSession.run());
 
             root.getChildren().addAll(

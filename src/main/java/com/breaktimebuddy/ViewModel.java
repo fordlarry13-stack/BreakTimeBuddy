@@ -13,71 +13,103 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 
-// TODO: Rename
 public class ViewModel {
-  private final BooleanProperty inSession = new SimpleBooleanProperty();
-  private final ReadOnlyStringWrapper sessionStatusText = new ReadOnlyStringWrapper();
-  private final IntegerProperty sessions = new SimpleIntegerProperty();
-  private final ObjectProperty<LocalTime> configFeedbackTimestamp = new SimpleObjectProperty<>();
-  private final StringProperty configFeedbackMessage = new SimpleStringProperty();
 
-  public ViewModel() {
-    sessionStatusText.bind(Bindings.when(inSession).then("In session").otherwise("Not in session"));
-  }
+    // --- EXISTING PROPERTIES ---
+    private final BooleanProperty inSession = new SimpleBooleanProperty();
+    private final ReadOnlyStringWrapper sessionStatusText = new ReadOnlyStringWrapper();
+    private final IntegerProperty sessions = new SimpleIntegerProperty();
+    private final ObjectProperty<LocalTime> configFeedbackTimestamp = new SimpleObjectProperty<>();
+    private final StringProperty configFeedbackMessage = new SimpleStringProperty();
 
-  public boolean getInSession() {
-    return inSession.get();
-  }
+    // --- NEW: AI Recommendation ---
+    private final StringProperty aiRecommendation = new SimpleStringProperty("");
 
-  public BooleanProperty isSessionProperty() {
-    return inSession;
-  }
+    public ViewModel() {
+        sessionStatusText.bind(
+                Bindings.when(inSession)
+                        .then("In session")
+                        .otherwise("Not in session")
+        );
+    }
 
-  public void setInSession(boolean inSession) {
-    this.inSession.set(inSession);
-  }
+    // --- EXISTING GETTERS/SETTERS ---
+    public boolean getInSession() {
+        return inSession.get();
+    }
 
-  public String getSessionStatusText() {
-    return sessionStatusText.get();
-  }
+    public BooleanProperty isSessionProperty() {
+        return inSession;
+    }
 
-  public ReadOnlyStringProperty sessionStatusTextProperty() {
-    return sessionStatusText.getReadOnlyProperty();
-  }
+    public void setInSession(boolean inSession) {
+        this.inSession.set(inSession);
+    }
 
-  public int getSessions() {
-    return sessions.get();
-  }
+    public String getSessionStatusText() {
+        return sessionStatusText.get();
+    }
 
-  public IntegerProperty sessionsProperty() {
-    return sessions;
-  }
+    public ReadOnlyStringProperty sessionStatusTextProperty() {
+        return sessionStatusText.getReadOnlyProperty();
+    }
 
-  public void setSessions(int sessions) {
-    this.sessions.set(sessions);
-  }
+    public int getSessions() {
+        return sessions.get();
+    }
 
-  public LocalTime getConfigFeedbackTimestamp() {
-    return configFeedbackTimestamp.get();
-  }
+    public IntegerProperty sessionsProperty() {
+        return sessions;
+    }
 
-  public ObjectProperty<LocalTime> configFeedbackTimestampProperty() {
-    return configFeedbackTimestamp;
-  }
+    public void setSessions(int sessions) {
+        this.sessions.set(sessions);
+    }
 
-  public void setConfigFeedbackTimestamp(LocalTime configFeedbackTimestamp) {
-    this.configFeedbackTimestamp.set(configFeedbackTimestamp);
-  }
+    public LocalTime getConfigFeedbackTimestamp() {
+        return configFeedbackTimestamp.get();
+    }
 
-  public String getConfigFeedbackMessage() {
-    return configFeedbackMessage.get();
-  }
+    public ObjectProperty<LocalTime> configFeedbackTimestampProperty() {
+        return configFeedbackTimestamp;
+    }
 
-  public StringProperty configFeedbackMessageProperty() {
-    return configFeedbackMessage;
-  }
+    public void setConfigFeedbackTimestamp(LocalTime configFeedbackTimestamp) {
+        this.configFeedbackTimestamp.set(configFeedbackTimestamp);
+    }
 
-  public void setConfigFeedbackMessage(String configFeedbackMessage) {
-    this.configFeedbackMessage.set(configFeedbackMessage);
-  }
+    public String getConfigFeedbackMessage() {
+        return configFeedbackMessage.get();
+    }
+
+    public StringProperty configFeedbackMessageProperty() {
+        return configFeedbackMessage;
+    }
+
+    public void setConfigFeedbackMessage(String configFeedbackMessage) {
+        this.configFeedbackMessage.set(configFeedbackMessage);
+    }
+
+    // -------------------------------------------------------------------------
+    // ⭐ NEW METHODS REQUIRED BY ViewBuilder
+    // -------------------------------------------------------------------------
+
+    // 1. Wrapper for session state
+    public boolean isSessionActive() {
+        return inSession.get();
+    }
+
+    // 2. Placeholder break logic
+    public void takeBreak() {
+        sessions.set(sessions.get() + 1);
+    }
+
+    // 3. AI Recommendation property
+    public StringProperty aiRecommendationProperty() {
+        return aiRecommendation;
+    }
+
+    public void setAiRecommendation(String value) {
+        aiRecommendation.set(value);
+    }
 }
