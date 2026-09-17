@@ -11,13 +11,22 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-
+import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSyntaxException;
 
 class ConfigHandlerTest {
+    private static final List<ConfigData.HistoryItem> testHistory = List.of(
+            new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
+                    Instant.ofEpochSecond(1, 2), Instant.ofEpochSecond(3, 4)),
+            new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.BREAK,
+                    Instant.ofEpochSecond(5, 6), Instant.ofEpochSecond(7, 8)));
+    private static final String testHistoryJson =
+            """
+                    [{"phase":"WORK","beginTime":{"seconds":1,"nanos":2},"endTime":{"seconds":3,"nanos":4}},{"phase":"BREAK","beginTime":{"seconds":5,"nanos":6},"endTime":{"seconds":7,"nanos":8}}]""";
 
     private Storage storage;
     private ConfigHandler handler;
@@ -30,6 +39,9 @@ class ConfigHandlerTest {
 
     @Test
     void testReadReturnsConfigData() throws IOException, JsonParseException {
+        // Arrange: storage provides valid JSON for ConfigData
+        String json = """
+                {"sessions":5,"history":%s}""".formatted(testHistoryJson);
         ((FakeStorage) storage).setInputData(json);
 
         // Act
@@ -38,12 +50,13 @@ class ConfigHandlerTest {
         // Assert
         assertNotNull(data);
         assertEquals(5, data.sessions());
+        assertIterableEquals(testHistory, data.history());
     }
 
     @Test
     void testWriteWritesJson() throws IOException {
         // Arrange
-        ConfigData data = new ConfigData(10);
+        ConfigData data = new ConfigData(10, testHistory);
         ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
         ((FakeStorage) storage).setOutputCaptor(outBytes);
 
@@ -52,8 +65,11 @@ class ConfigHandlerTest {
 
         // Assert
         String written = outBytes.toString(StandardCharsets.UTF_8.name());
-        // The written JSON should contain sessions:10
-        assertTrue(written.contains("\"sessions\":10"));
+        // The written JSON should contain the data
+        assertTrue(written.contains("""
+                "sessions":10"""));
+        assertTrue(written.contains("""
+                "history":%s""".formatted(testHistoryJson)));
     }
 
     @Test
@@ -69,7 +85,7 @@ class ConfigHandlerTest {
     void testWriteThrowsIOExceptionWhenStorageThrows() throws IOException {
         // Arrange: Simulate output failure
         ((FakeStorage) storage).setThrowOnOut(true);
-        ConfigData data = new ConfigData(1);
+        ConfigData data = new ConfigData(1, testHistory);
 
         // Act & Assert
         assertThrows(IOException.class, () -> handler.write(data));

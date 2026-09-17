@@ -9,11 +9,24 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.google.gson.JsonParseException;
 
 class InteractorTest {
+    private static final List<HistoryItem> testHistory = List.of(
+            HistoryItem.open(HistoryItem.Phase.WORK, Instant.ofEpochSecond(1, 2))
+                    .close(Instant.ofEpochSecond(3, 4)),
+            HistoryItem.open(HistoryItem.Phase.BREAK, Instant.ofEpochSecond(5, 6))
+                    .close(Instant.ofEpochSecond(7, 8)));
+    private static final List<ConfigData.HistoryItem> testHistoryData = List.of(
+            new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
+                    Instant.ofEpochSecond(1, 2), Instant.ofEpochSecond(3, 4)),
+            new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.BREAK,
+                    Instant.ofEpochSecond(5, 6), Instant.ofEpochSecond(7, 8)));
+
     private ViewModel viewModel;
     private FakeConfigHandler configHandler;
     private Interactor interactor;
@@ -30,6 +43,7 @@ class InteractorTest {
         // Initially not in session
         assertFalse(viewModel.getInSession());
         assertEquals(0, viewModel.getSessions());
+        assertEquals(List.of(), viewModel.getHistory());
     }
 
     @Test
@@ -40,6 +54,7 @@ class InteractorTest {
         // Should now be in session, sessions count unchanged (still 0)
         assertTrue(viewModel.getInSession());
         assertEquals(0, viewModel.getSessions());
+        assertEquals(List.of(), viewModel.getHistory());
     }
 
     @Test
@@ -51,6 +66,8 @@ class InteractorTest {
         // Sessions incremented when ending
         assertFalse(viewModel.getInSession());
         assertEquals(1, viewModel.getSessions());
+        assertEquals(1, viewModel.getHistory().size());
+        assertEquals(HistoryItem.Phase.WORK, viewModel.getHistory().get(0).phase());
     }
 
     @Test
@@ -62,14 +79,19 @@ class InteractorTest {
         ConfigData data = configHandler.getLastDataWritten();
         assertNotNull(data);
         assertEquals(3, data.sessions());
+        assertEquals(5, data.history().size());
+        for (int i = 0; i < 5; i++)
+            assertEquals(i % 2 == 0 ? ConfigData.HistoryItem.Phase.WORK
+                    : ConfigData.HistoryItem.Phase.BREAK, data.history().get(i).phase());
     }
 
     @Test
     void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonParseException {
-        configHandler.setDataToReturn(new ConfigData(7, null));
+        configHandler.setDataToReturn(new ConfigData(7, testHistoryData));
         interactor.loadConfig();
         interactor.updateModel();
         assertEquals(7, viewModel.getSessions());
+        assertIterableEquals(testHistory, viewModel.getHistory());
     }
 
     @Test
@@ -138,6 +160,8 @@ class InteractorTest {
                 throw new IOException("Simulated read error");
             if (throwOnReadJsonParseException)
                 throw new JsonParseException("Simulated read error");
+            if (dataToReturn == null)
+                throw new IllegalStateException("dataToReturn can not be null");
             return dataToReturn;
         }
 

@@ -21,6 +21,7 @@ public class ConfigHandler {
   }
 
   public ConfigData read() throws IOException, JsonParseException {
+    // TODO: Handle invalid data
     Gson gson = new Gson();
     try (InputStream in = storage.in();
         var reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
