@@ -21,11 +21,10 @@ public class ConfigHandler {
   }
 
   public ConfigData read() throws IOException, JsonParseException {
-    // TODO: Handle invalid data
     Gson gson = new Gson();
     try (InputStream in = storage.in();
         var reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
-      return gson.fromJson(reader, ConfigData.class);
+      return ConfigData.sanitize(gson.fromJson(reader, ConfigData.class));
     }
   }
 

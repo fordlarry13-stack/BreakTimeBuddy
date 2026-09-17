@@ -11,4 +11,31 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) List<HistoryItem>
       WORK, BREAK;
     }
   }
+
+  private static ConfigData sanitize(ConfigData data, boolean output) {
+    int sessions = 0;
+    List<HistoryItem> history = List.of();
+    if (data == null) {
+      if (output)
+        System.out.println("ConfigData.sanitize(): data is null");
+    } else {
+      if (data.sessions < 0) {
+        if (output)
+          System.out.println("ConfigData.sanitize(): data.sessions is invalid (negative)");
+      } else {
+        sessions = data.sessions();
+      }
+      // TODO
+      history = data.history;
+    }
+    return new ConfigData(sessions, history);
+  }
+
+  public static ConfigData sanitize(ConfigData data) {
+    return sanitize(data, true);
+  }
+
+  public static ConfigData getDefault() {
+    return sanitize(null, false);
+  }
 }

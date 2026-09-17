@@ -3,11 +3,13 @@ package com.breaktimebuddy;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.function.Consumer;
 import com.google.gson.JsonParseException;
 
 // TODO: Rename
 public class Interactor {
-  private final ViewModel viewModel;
+  private final Consumer<State> stateChangeListener;
   private final ConfigHandler configHandler;
 
   private boolean inSession;
@@ -17,15 +19,16 @@ public class Interactor {
   private LinkedList<HistoryItem> history = new LinkedList<>();
   private HistoryItem.Open nextHistoryItem;
 
-  public Interactor(ViewModel model, ConfigHandler configHandler) {
-    this.viewModel = model;
+  public Interactor(Consumer<State> stateChangeListener, ConfigHandler configHandler) {
+    this.stateChangeListener = stateChangeListener;
+    spreadConfigData(ConfigData.getDefault());
     this.configHandler = configHandler;
   }
 
-  public void updateModel() {
-    viewModel.setInSession(inSession);
-    viewModel.setSessions(sessions);
-    viewModel.setHistory(history);
+  private void notifyStateChange() {
+    if (stateChangeListener == null)
+      return;
+    stateChangeListener.accept(new State(inSession, sessions, List.copyOf(history)));
   }
 
   public void toggleSession() {
@@ -40,6 +43,7 @@ public class Interactor {
     }
     nextHistoryItem =
         HistoryItem.open(inSession ? HistoryItem.Phase.WORK : HistoryItem.Phase.BREAK, current);
+    notifyStateChange();
   }
 
   public void saveConfig() throws IOException {
@@ -52,12 +56,16 @@ public class Interactor {
   }
 
   public void loadConfig() throws IOException, JsonParseException {
-    ConfigData data = configHandler.read();
+    spreadConfigData(configHandler.read());
+  }
+
+  private void spreadConfigData(ConfigData data) {
     sessions = data.sessions();
     history.clear();
     history.addAll(data.history().stream().map(e -> HistoryItem.open(switch (e.phase()) {
       case WORK -> HistoryItem.Phase.WORK;
       case BREAK -> HistoryItem.Phase.BREAK;
     }, e.beginTime()).close(e.endTime())).limit(HISTORY_LENGTH).toList());
+    notifyStateChange();
   }
 }
