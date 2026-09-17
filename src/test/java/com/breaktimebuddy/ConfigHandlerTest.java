@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonSyntaxException;
 
 class ConfigHandlerTest {
@@ -28,9 +29,7 @@ class ConfigHandlerTest {
     }
 
     @Test
-    void testReadReturnsConfigData() throws IOException, JsonSyntaxException {
-        // Arrange: storage provides valid JSON for ConfigData with sessions = 5
-        String json = "{\"sessions\":5}";
+    void testReadReturnsConfigData() throws IOException, JsonParseException {
         ((FakeStorage) storage).setInputData(json);
 
         // Act
@@ -58,7 +57,7 @@ class ConfigHandlerTest {
     }
 
     @Test
-    void testReadThrowsIOExceptionWhenStorageThrows() throws IOException, JsonSyntaxException {
+    void testReadThrowsIOExceptionWhenStorageThrows() throws IOException, JsonParseException {
         // Arrange: Simulate input failure
         ((FakeStorage) storage).setThrowOnIn(true);
 

@@ -11,7 +11,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import com.google.gson.JsonSyntaxException;
+import com.google.gson.JsonParseException;
 
 class InteractorTest {
     private ViewModel viewModel;
@@ -65,8 +65,8 @@ class InteractorTest {
     }
 
     @Test
-    void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonSyntaxException {
-        configHandler.setDataToReturn(new ConfigData(7));
+    void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonParseException {
+        configHandler.setDataToReturn(new ConfigData(7, null));
         interactor.loadConfig();
         interactor.updateModel();
         assertEquals(7, viewModel.getSessions());
@@ -85,16 +85,16 @@ class InteractorTest {
     }
 
     @Test
-    void testLoadConfigThrowsJsonSyntaxExceptionWhenConfigHandlerThrowsJsonSyntaxException() {
-        configHandler.setThrowOnReadJsonSyntaxException(true);
-        assertThrows(JsonSyntaxException.class, () -> interactor.loadConfig());
+    void testLoadConfigThrowsJsonParseExceptionWhenConfigHandlerThrowsJsonParseException() {
+        configHandler.setThrowOnReadJsonParseException(true);
+        assertThrows(JsonParseException.class, () -> interactor.loadConfig());
     }
 
     /** A fake ConfigHandler for testing Interactor in isolation. */
     private static class FakeConfigHandler extends ConfigHandler {
         private ConfigData dataToReturn;
         private boolean throwOnReadIOException;
-        private boolean throwOnReadJsonSyntaxException;
+        private boolean throwOnReadJsonParseException;
         private boolean throwOnWrite;
         private ConfigData lastDataWritten;
 
@@ -110,7 +110,6 @@ class InteractorTest {
                     throw new UnsupportedOperationException("Unimplemented method 'out'");
                 }
             }); // Anonymous subclass, won't be used
-            this.dataToReturn = new ConfigData(0);
         }
 
         public void setDataToReturn(ConfigData data) {
@@ -125,8 +124,8 @@ class InteractorTest {
             this.throwOnReadIOException = value;
         }
 
-        public void setThrowOnReadJsonSyntaxException(boolean value) {
-            this.throwOnReadJsonSyntaxException = value;
+        public void setThrowOnReadJsonParseException(boolean value) {
+            this.throwOnReadJsonParseException = value;
         }
 
         public void setThrowOnWrite(boolean value) {
@@ -134,11 +133,11 @@ class InteractorTest {
         }
 
         @Override
-        public ConfigData read() throws IOException, JsonSyntaxException {
+        public ConfigData read() throws IOException, JsonParseException {
             if (throwOnReadIOException)
                 throw new IOException("Simulated read error");
-            if (throwOnReadJsonSyntaxException)
-                throw new JsonSyntaxException("Simulated read error");
+            if (throwOnReadJsonParseException)
+                throw new JsonParseException("Simulated read error");
             return dataToReturn;
         }
 

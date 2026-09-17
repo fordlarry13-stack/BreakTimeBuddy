@@ -3,7 +3,7 @@ package com.breaktimebuddy;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.LinkedList;
-import com.google.gson.JsonSyntaxException;
+import com.google.gson.JsonParseException;
 
 // TODO: Rename
 public class Interactor {
@@ -51,7 +51,7 @@ public class Interactor {
     configHandler.write(data);
   }
 
-  public void loadConfig() throws IOException, JsonSyntaxException {
+  public void loadConfig() throws IOException, JsonParseException {
     ConfigData data = configHandler.read();
     sessions = data.sessions();
     history.clear();
