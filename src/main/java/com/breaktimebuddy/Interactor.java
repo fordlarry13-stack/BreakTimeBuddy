@@ -43,12 +43,21 @@ public class Interactor {
   }
 
   public void saveConfig() throws IOException {
-    ConfigData data = new ConfigData(sessions);
+    ConfigData data = new ConfigData(sessions,
+        history.stream().map(e -> new ConfigData.HistoryItem(switch (e.phase()) {
+          case WORK -> ConfigData.HistoryItem.Phase.WORK;
+          case BREAK -> ConfigData.HistoryItem.Phase.BREAK;
+        }, e.beginTime(), e.endTime())).toList());
     configHandler.write(data);
   }
 
   public void loadConfig() throws IOException, JsonSyntaxException {
     ConfigData data = configHandler.read();
     sessions = data.sessions();
+    history.clear();
+    history.addAll(data.history().stream().map(e -> HistoryItem.open(switch (e.phase()) {
+      case WORK -> HistoryItem.Phase.WORK;
+      case BREAK -> HistoryItem.Phase.BREAK;
+    }, e.beginTime()).close(e.endTime())).limit(HISTORY_LENGTH).toList());
   }
 }
