@@ -1,6 +1,8 @@
 package com.breaktimebuddy;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.LinkedList;
 import com.google.gson.JsonSyntaxException;
 
 // TODO: Rename
@@ -10,6 +12,10 @@ public class Interactor {
 
   private boolean inSession;
   private int sessions;
+  private final int HISTORY_LENGTH = 20;
+  /** Newest first */
+  private LinkedList<HistoryItem> history = new LinkedList<>();
+  private HistoryItem.Open nextHistoryItem;
 
   public Interactor(ViewModel model, ConfigHandler configHandler) {
     this.viewModel = model;
@@ -19,12 +25,21 @@ public class Interactor {
   public void updateModel() {
     viewModel.setInSession(inSession);
     viewModel.setSessions(sessions);
+    viewModel.setHistory(history);
   }
 
   public void toggleSession() {
     if (inSession)
       sessions++;
     inSession = !inSession;
+    Instant current = Instant.now();
+    if (nextHistoryItem != null) {
+      if (history.size() >= HISTORY_LENGTH)
+        history.removeLast();
+      history.addFirst(nextHistoryItem.close(current));
+    }
+    nextHistoryItem =
+        HistoryItem.open(inSession ? HistoryItem.Phase.WORK : HistoryItem.Phase.BREAK, current);
   }
 
   public void saveConfig() throws IOException {

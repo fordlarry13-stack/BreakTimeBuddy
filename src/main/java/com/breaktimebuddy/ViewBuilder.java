@@ -2,6 +2,7 @@ package com.breaktimebuddy;
 
 import java.time.LocalTime;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import javafx.beans.binding.Bindings;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -33,6 +34,14 @@ public class ViewBuilder implements Builder<Region> {
         .then("In session").otherwise("Not in session"));
     Label sessionsLabel = new Label();
     sessionsLabel.textProperty().bind(viewModel.sessionsProperty().asString("Sessions: %d"));
+    Label historyLabel = new Label();
+    historyLabel.textProperty()
+        .bind(Bindings.createStringBinding(
+            () -> String.format("History (%d):\n", viewModel.getHistory().size())
+                + viewModel.getHistory().stream()
+                    .map(e -> String.format("%s %s %s", e.phase(), e.beginTime(), e.endTime()))
+                    .collect(Collectors.joining("\n")),
+            viewModel.historyProperty()));
     Label configFeedbackLabel = new Label();
     Button saveConfigButton = new Button("Save config");
     saveConfigButton.setOnAction(e -> saveConfig.accept(error -> {
@@ -52,7 +61,7 @@ public class ViewBuilder implements Builder<Region> {
         error.printStackTrace();
       }
     }));
-    return new VBox(sampleLabel, sessionToggleButton, sessionsLabel, saveConfigButton,
+    return new VBox(sampleLabel, sessionToggleButton, sessionsLabel, historyLabel, saveConfigButton,
         loadConfigButton, configFeedbackLabel);
   }
 }
