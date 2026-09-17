@@ -38,6 +38,25 @@ public class HistoryItem implements Cloneable {
     return this.endTime;
   }
 
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj)
+      return true;
+    if (obj instanceof HistoryItem obj2)
+      return this.phase().equals(obj2.phase()) && this.beginTime().equals(obj2.beginTime())
+          && this.endTime().equals(obj2.endTime());
+    return false;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = 17;
+    result = 31 * result + phase().hashCode();
+    result = 31 * result + beginTime().hashCode();
+    result = 31 * result + endTime().hashCode();
+    return result;
+  }
+
   /**
    * A one-time builder for {@link HistoryItem}. Call {@link #close(Instant)} for the completed
    * object.
