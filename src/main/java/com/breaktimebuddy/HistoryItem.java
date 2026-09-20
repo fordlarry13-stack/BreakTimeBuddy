@@ -80,6 +80,14 @@ public class HistoryItem implements Cloneable {
       return open;
     }
 
+    public Phase phase() {
+      return this.item.phase;
+    }
+
+    public Instant beginTime() {
+      return this.item.beginTime;
+    }
+
     /**
      * @param endTime
      * @throws IllegalStateException The method is called more than once.

@@ -1,6 +1,7 @@
 package com.breaktimebuddy;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
@@ -108,7 +109,8 @@ public class Interactor {
     if (!breakRecommendationRequested.compareAndSet(false, true))
       return;
     CompletableFuture<String> future =
-        recommendationService.getRecommendation(new RecommendationRequest(sessions));
+        recommendationService.getRecommendation(new RecommendationRequest(sessions,
+            Duration.between(nextHistoryItem.beginTime(), Instant.now()), List.copyOf(history)));
     currentBreakRecommendationFuture = future;
     future.whenComplete((message, error) -> {
       if (future != currentBreakRecommendationFuture)
