@@ -22,7 +22,7 @@ public class Interactor {
 
   private boolean inSession;
   private int sessions;
-  private final int HISTORY_LENGTH = 20;
+  private static final int HISTORY_LENGTH = 20;
   /** Newest first */
   private LinkedList<HistoryItem> history = new LinkedList<>();
   private HistoryItem.Open nextHistoryItem;
