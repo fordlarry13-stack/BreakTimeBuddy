@@ -18,6 +18,8 @@ public class ViewModel {
   private final BooleanProperty inSession = new SimpleBooleanProperty();
   private final ReadOnlyStringWrapper sessionStatusText = new ReadOnlyStringWrapper();
   private final IntegerProperty sessions = new SimpleIntegerProperty();
+  private final BooleanProperty breakRecommendationRequested = new SimpleBooleanProperty();
+  private final ObjectProperty<DialogState> dialogState = new SimpleObjectProperty<>();
   private final ObjectProperty<LocalTime> configFeedbackTimestamp = new SimpleObjectProperty<>();
   private final StringProperty configFeedbackMessage = new SimpleStringProperty();
 
@@ -55,6 +57,30 @@ public class ViewModel {
 
   public void setSessions(int sessions) {
     this.sessions.set(sessions);
+  }
+
+  public boolean getBreakRecommendationRequested() {
+    return breakRecommendationRequested.get();
+  }
+
+  public BooleanProperty breakRecommendationRequestedProperty() {
+    return breakRecommendationRequested;
+  }
+
+  public void setBreakRecommendationRequested(boolean breakRecommendationRequested) {
+    this.breakRecommendationRequested.set(breakRecommendationRequested);
+  }
+
+  public DialogState getDialogState() {
+    return dialogState.get();
+  }
+
+  public ObjectProperty<DialogState> dialogStateProperty() {
+    return dialogState;
+  }
+
+  public void setDialogState(DialogState dialogState) {
+    this.dialogState.set(dialogState);
   }
 
   public LocalTime getConfigFeedbackTimestamp() {

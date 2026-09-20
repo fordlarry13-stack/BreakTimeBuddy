@@ -11,15 +11,33 @@ public class Controller {
   private final ViewBuilder viewBuilder;
 
   public Controller(ConfigHandler configHandler) {
-    viewModel = new ViewModel();
-    interactor =
-        new Interactor(state -> Platform.runLater(() -> updateModel(state)), configHandler);
-    viewBuilder =
-        new ViewBuilder(viewModel, this::toggleSession, this::saveConfig, this::loadConfig);
+    this(configHandler, new GroqRecommendationService());
   }
 
-  private void toggleSession() {
-    interactor.toggleSession();
+  Controller(ConfigHandler configHandler, RecommendationService recommendationService) {
+    viewModel = new ViewModel();
+    interactor =
+        new Interactor(state -> Platform.runLater(() -> updateModel(state)), configHandler,
+            recommendationService);
+    viewBuilder = new ViewBuilder(viewModel, this::switchWorkBreak, this::saveConfig,
+        this::loadConfig, this::requestBreakRecommendationNow, this::acceptBreakRecommendation,
+        this::rejectBreakRecommendation);
+  }
+
+  private void switchWorkBreak() {
+    interactor.switchWorkBreak();
+  }
+
+  private void requestBreakRecommendationNow() {
+    interactor.requestBreakRecommendationNow();
+  }
+
+  private void acceptBreakRecommendation() {
+    interactor.acceptBreakRecommendation(viewModel.getDialogState().id());
+  }
+
+  private void rejectBreakRecommendation() {
+    interactor.rejectBreakRecommendation(viewModel.getDialogState().id());
   }
 
   private void saveConfig() {
@@ -51,6 +69,8 @@ public class Controller {
   private void updateModel(State state) {
     viewModel.setInSession(state.inSession());
     viewModel.setSessions(state.sessions());
+    viewModel.setBreakRecommendationRequested(state.breakRecommendationRequested());
+    viewModel.setDialogState(state.dialogState());
   }
 
   public Region getView() {
