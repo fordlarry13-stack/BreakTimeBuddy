@@ -11,7 +11,7 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>13</version>
+            <version>17.0.20</version>
         </dependency>
         <!-- AI-generated: JUnit 5 dependency for testing -->
         <dependency>
@@ -25,6 +25,8 @@
             <version>5.10.0</version>
             <scope>test</scope>
         </dependency>
+    
+
     </dependencies>
     <build>
         <plugins>
