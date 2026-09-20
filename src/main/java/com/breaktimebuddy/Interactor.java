@@ -62,7 +62,7 @@ public class Interactor {
       sessions++;
     setInSession(!inSession);
     Instant current = Instant.now();
-    if (nextHistoryItem != null) {
+    if (nextHistoryItem != null && nextHistoryItem.beginTime().isBefore(current)) {
       if (history.size() >= HISTORY_LENGTH)
         history.removeLast();
       history.addFirst(nextHistoryItem.close(current));

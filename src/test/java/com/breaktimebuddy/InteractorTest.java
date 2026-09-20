@@ -42,6 +42,19 @@ class InteractorTest {
     interactor = new Interactor(stateChangeCaptor, configHandler, recommendationService);
   }
 
+  /**
+   * Call {@link Interactor#switchWorkBreak}, then add a small delay. This is needed so session
+   * start and end times are distinct.
+   */
+  void switchWorkBreakAndDelay() {
+    interactor.switchWorkBreak();
+    try {
+      Thread.sleep(1);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+
   @Test
   void testInitialState() {
     // Initially not in session
@@ -54,8 +67,8 @@ class InteractorTest {
   @Test
   void testSwitchWorkBreakStartsSession() {
     // Toggle to start session
-    interactor.switchWorkBreak();
-    // Should now be in session, sessions count unchanged (still 0)
+    switchWorkBreakAndDelay();
+    // Should nswitchWorkBreakAndDelayow be in session, sessions count unchanged (still 0)
     State state = stateChangeCaptor.lastState;
     assertTrue(state.inSession());
     assertEquals(0, state.sessions());
@@ -64,9 +77,9 @@ class InteractorTest {
 
   @Test
   void testSwitchWorkBreakEndsSessionIncrementsCount() {
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     // End the session (switchWorkBreak when in session)
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     // Sessions incremented when ending
     State state = stateChangeCaptor.lastState;
     assertFalse(state.inSession());
@@ -76,10 +89,29 @@ class InteractorTest {
   }
 
   @Test
+  void testSwitchWorkBreakRemovesOldestItemOfLongHistory() throws InterruptedException {
+    final int HISTORY_LENGTH = 20;
+    // Fill the history
+    for (int i = 0; i < HISTORY_LENGTH + 1; i++)
+      switchWorkBreakAndDelay();
+
+    State state = stateChangeCaptor.lastState;
+    HistoryItem lastHistoryItem = state.history().get(state.history().size() - 1);
+    assertEquals(HISTORY_LENGTH, state.history().size());
+    assertTrue(state.history().contains(lastHistoryItem));
+
+    switchWorkBreakAndDelay();
+
+    state = stateChangeCaptor.lastState;
+    assertEquals(HISTORY_LENGTH, state.history().size());
+    assertFalse(state.history().contains(lastHistoryItem));
+  }
+
+  @Test
   void testSaveConfigCallsConfigHandlerWrite() throws IOException {
     // Set up state: end 3 sessions
     for (int i = 0; i < 6; i++)
-      interactor.switchWorkBreak();
+      switchWorkBreakAndDelay();
     interactor.saveConfig();
     ConfigData data = configHandler.getLastDataWritten();
     assertNotNull(data);
@@ -120,7 +152,7 @@ class InteractorTest {
 
   @Test
   void testRecommendationRequestInvokesServiceAndDisplaysResult() {
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
 
     interactor.requestBreakRecommendationNow();
 
@@ -138,7 +170,7 @@ class InteractorTest {
 
   @Test
   void testRecommendationFailureClearsRequestWithoutOpeningDialog() {
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     interactor.requestBreakRecommendationNow();
 
     recommendationService.future.completeExceptionally(new RuntimeException("Simulated error"));
@@ -151,10 +183,10 @@ class InteractorTest {
   @Test
   void testStaleRecommendationDoesNotReopenDialogAfterManualSwitch() {
     recommendationService.future = new NonCancellableFuture();
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     interactor.requestBreakRecommendationNow();
 
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     recommendationService.future.complete("Stale recommendation");
 
     State state = stateChangeCaptor.lastState;
