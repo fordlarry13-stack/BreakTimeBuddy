@@ -46,7 +46,8 @@ public class Interactor {
   public void setPreferredWorkLength(Duration preferredWorkLength) {
     this.preferredWorkLength =
         preferredWorkLength == null ? ConfigData.getDefault().preferredWorkLength()
-            : PreferencesHelper.clampAndQuantize(preferredWorkLength,
+            : PreferencesHelper.defaultClampAndQuantize(preferredWorkLength,
+                PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
                 PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
                 PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
                 PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);

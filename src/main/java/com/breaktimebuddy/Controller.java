@@ -16,12 +16,17 @@ public class Controller {
 
   Controller(ConfigHandler configHandler, RecommendationService recommendationService) {
     viewModel = new ViewModel();
-    interactor =
-        new Interactor(state -> Platform.runLater(() -> updateModel(state)), configHandler,
-            recommendationService);
+    interactor = new Interactor(state -> {
+      if (Platform.isFxApplicationThread())
+        updateModel(state);
+      else
+        Platform.runLater(() -> updateModel(state));
+    }, configHandler, recommendationService);
     viewBuilder = new ViewBuilder(viewModel, this::switchWorkBreak, this::saveConfig,
         this::loadConfig, this::requestBreakRecommendationNow, this::acceptBreakRecommendation,
         this::rejectBreakRecommendation);
+    viewModel.preferredWorkLengthProperty()
+        .addListener((_0, _1, value) -> interactor.setPreferredWorkLength(value));
   }
 
   private void switchWorkBreak() {
@@ -69,6 +74,9 @@ public class Controller {
   private void updateModel(State state) {
     viewModel.setInSession(state.inSession());
     viewModel.setSessions(state.sessions());
+    viewModel.setPreferredWorkLength(state.preferredWorkLength());
+    if (interactor == null)
+      viewModel.setDefaultPreferredWorkLength(state.preferredWorkLength());
     viewModel.setBreakRecommendationRequested(state.breakRecommendationRequested());
     viewModel.setDialogState(state.dialogState());
   }

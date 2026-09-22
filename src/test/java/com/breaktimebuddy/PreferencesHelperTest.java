@@ -7,26 +7,32 @@ import org.junit.jupiter.api.*;
 
 class PreferencesHelperTest {
   @Test
-  void testClampAndQuantizeValid() {
+  void testDefaultClampAndQuantizeValid() {
+    assertEquals(Duration.ofSeconds(300), PreferencesHelper
+        .defaultClampAndQuantize(Duration.ofSeconds(300), 5, 1, 10, ChronoUnit.MINUTES));
+  }
+
+  @Test
+  void testDefaultClampAndQuantizeNull() {
     assertEquals(Duration.ofSeconds(300),
-        PreferencesHelper.clampAndQuantize(Duration.ofSeconds(300), 1, 10, ChronoUnit.MINUTES));
+        PreferencesHelper.defaultClampAndQuantize(null, 5, 2, 10, ChronoUnit.MINUTES));
   }
 
   @Test
-  void testClampAndQuantizeSmall() {
-    assertEquals(Duration.ofSeconds(120),
-        PreferencesHelper.clampAndQuantize(Duration.ofSeconds(60), 2, 10, ChronoUnit.MINUTES));
+  void testDefaultClampAndQuantizeSmall() {
+    assertEquals(Duration.ofSeconds(120), PreferencesHelper
+        .defaultClampAndQuantize(Duration.ofSeconds(60), 5, 2, 10, ChronoUnit.MINUTES));
   }
 
   @Test
-  void testClampAndQuantizeLarge() {
-    assertEquals(Duration.ofSeconds(600),
-        PreferencesHelper.clampAndQuantize(Duration.ofSeconds(900), 1, 10, ChronoUnit.MINUTES));
+  void testDefaultClampAndQuantizeLarge() {
+    assertEquals(Duration.ofSeconds(600), PreferencesHelper
+        .defaultClampAndQuantize(Duration.ofSeconds(900), 5, 1, 10, ChronoUnit.MINUTES));
   }
 
   @Test
-  void testClampAndQuantizeUnquantized() {
-    assertEquals(Duration.ofSeconds(300),
-        PreferencesHelper.clampAndQuantize(Duration.ofSeconds(330), 1, 10, ChronoUnit.MINUTES));
+  void testDefaultClampAndQuantizeUnquantized() {
+    assertEquals(Duration.ofSeconds(300), PreferencesHelper
+        .defaultClampAndQuantize(Duration.ofSeconds(330), 5, 1, 10, ChronoUnit.MINUTES));
   }
 }

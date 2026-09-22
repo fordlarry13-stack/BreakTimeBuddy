@@ -39,7 +39,8 @@ class InteractorTest {
     State state = stateChangeCaptor.lastState;
     assertFalse(state.inSession());
     assertEquals(0, state.sessions());
-    assertEquals(ConfigData.getDefault().preferredWorkLength(), state.preferredWorkLength());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), state.preferredWorkLength());
   }
 
   @Test
@@ -72,7 +73,9 @@ class InteractorTest {
     List<Duration> inputs = Arrays.asList(Duration.of(20, ChronoUnit.MINUTES), null,
         min.dividedBy(2), max.multipliedBy(2), min);
     List<Duration> expected = Arrays.asList(Duration.of(20, ChronoUnit.MINUTES),
-        ConfigData.getDefault().preferredWorkLength(), min, max, min);
+        Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+            PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH),
+        min, max, min);
     List<Duration> outputs = inputs.stream().map(e -> {
       interactor.setPreferredWorkLength(e);
       return stateChangeCaptor.lastState.preferredWorkLength();

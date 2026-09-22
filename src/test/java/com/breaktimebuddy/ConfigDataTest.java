@@ -34,7 +34,8 @@ class ConfigDataTest {
   @Test
   void testSanitizeNullPreferredWordLength() {
     ConfigData data = ConfigData.sanitize(new ConfigData(1, null));
-    assertNotNull(data.preferredWorkLength());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), data.preferredWorkLength());
   }
 
   @Test
