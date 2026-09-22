@@ -96,8 +96,8 @@ public class Interactor {
       return;
     if (!breakRecommendationRequested.compareAndSet(false, true))
       return;
-    CompletableFuture<String> future =
-        recommendationService.getRecommendation(new RecommendationRequest(sessions));
+    CompletableFuture<String> future = recommendationService
+        .getRecommendation(new RecommendationRequest(sessions, preferredWorkLength));
     currentBreakRecommendationFuture = future;
     future.whenComplete((message, error) -> {
       if (future != currentBreakRecommendationFuture)

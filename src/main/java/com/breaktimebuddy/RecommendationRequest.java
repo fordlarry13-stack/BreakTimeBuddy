@@ -1,3 +1,6 @@
 package com.breaktimebuddy;
 
-public record RecommendationRequest(int sessions){}
+import java.time.Duration;
+
+public record RecommendationRequest(int sessions, Duration preferredWorkLength) {
+}
