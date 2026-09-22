@@ -1,10 +1,13 @@
 package com.breaktimebuddy;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import com.google.gson.annotations.Since;
 
-public record ConfigData(@Since(1.0) int sessions) {
+public record ConfigData(@Since(1.0) int sessions, @Since(1.0) Duration preferredWorkLength) {
   private static ConfigData sanitize(ConfigData data, boolean output) {
     int sessions = 0;
+    Duration preferredWorkLength = Duration.of(50, ChronoUnit.MINUTES);
     if (data == null) {
       if (output)
         System.out.println("ConfigData.sanitize(): data is null");
@@ -15,8 +18,25 @@ public record ConfigData(@Since(1.0) int sessions) {
       } else {
         sessions = data.sessions();
       }
+      if (data.preferredWorkLength == null) {
+        if (output)
+          System.out.println("ConfigData.sanitize(): data.preferredWorkLength is null");
+      } else {
+        preferredWorkLength = PreferencesHelper.clampAndQuantize(data.preferredWorkLength,
+            PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
+            PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
+            PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+        if (!preferredWorkLength.equals(data.preferredWorkLength)) {
+          if (output)
+            System.out.println(
+                "ConfigData.sanitize(): data.preferredWorkLength is not clamped and quantized");
+        }
+      }
     }
-    return new ConfigData(sessions);
+    preferredWorkLength = PreferencesHelper.clampAndQuantize(preferredWorkLength,
+        PreferencesHelper.MIN_PREFERRED_WORK_LENGTH, PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    return new ConfigData(sessions, preferredWorkLength);
   }
 
   public static ConfigData sanitize(ConfigData data) {

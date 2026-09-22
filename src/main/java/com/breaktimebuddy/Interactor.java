@@ -1,6 +1,7 @@
 package com.breaktimebuddy;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,6 +20,7 @@ public class Interactor {
 
   private boolean inSession;
   private int sessions;
+  private Duration preferredWorkLength;
   private AtomicBoolean breakRecommendationRequested = new AtomicBoolean();
   private CompletableFuture<String> currentBreakRecommendationFuture;
   private AtomicReference<BreakRecommendationState> breakRecommendationState =
@@ -38,14 +40,25 @@ public class Interactor {
       clearAndCancelBreakRecommendationRequest(currentBreakRecommendationFuture);
       breakRecommendationState.set(null);
     }
+    notifyStateChange();
+  }
+
+  public void setPreferredWorkLength(Duration preferredWorkLength) {
+    this.preferredWorkLength =
+        preferredWorkLength == null ? ConfigData.getDefault().preferredWorkLength()
+            : PreferencesHelper.clampAndQuantize(preferredWorkLength,
+                PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
+                PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
+                PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    notifyStateChange();
   }
 
   private void notifyStateChange() {
     if (stateChangeListener == null)
       return;
     BreakRecommendationState breakRecommendationState = this.breakRecommendationState.get();
-    stateChangeListener.accept(new State(inSession, sessions, breakRecommendationRequested.get(),
-        breakRecommendationState == null ? null
+    stateChangeListener.accept(new State(inSession, sessions, preferredWorkLength,
+        breakRecommendationRequested.get(), breakRecommendationState == null ? null
             : new DialogState(breakRecommendationState.id(), breakRecommendationState.message())));
   }
 
@@ -53,11 +66,10 @@ public class Interactor {
     if (inSession)
       sessions++;
     setInSession(!inSession);
-    notifyStateChange();
   }
 
   public void saveConfig() throws IOException {
-    ConfigData data = new ConfigData(sessions);
+    ConfigData data = new ConfigData(sessions, preferredWorkLength);
     configHandler.write(data);
   }
 
@@ -67,6 +79,7 @@ public class Interactor {
 
   private void spreadConfigData(ConfigData data) {
     sessions = data.sessions();
+    preferredWorkLength = data.preferredWorkLength();
     notifyStateChange();
   }
 
@@ -83,8 +96,8 @@ public class Interactor {
       return;
     if (!breakRecommendationRequested.compareAndSet(false, true))
       return;
-    CompletableFuture<String> future = recommendationService
-        .getRecommendation(new RecommendationRequest(sessions));
+    CompletableFuture<String> future =
+        recommendationService.getRecommendation(new RecommendationRequest(sessions));
     currentBreakRecommendationFuture = future;
     future.whenComplete((message, error) -> {
       if (future != currentBreakRecommendationFuture)
