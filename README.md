@@ -2,8 +2,6 @@
 
 Desktop app (Java + JavaFX) that tracks work sessions and recommends a short break. Recommendations come from Groq when `GROQ_API_KEY` is set, otherwise from a simple fallback.
 
-Alpha limitation: the recommendation service exists, but it is not shown in the window yet.
-
 ## Requirements
 
 - Java 17
