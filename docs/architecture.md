@@ -63,7 +63,3 @@ Later:
 - recommendation returns a short string
 - CI stays green
 
-## Known gaps
-
-Recommendation is not on the window yet. The recommender only sees session count. Companion mood is not built.
-
