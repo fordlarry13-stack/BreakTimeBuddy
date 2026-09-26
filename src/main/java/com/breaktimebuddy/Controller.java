@@ -16,9 +16,8 @@ public class Controller {
 
   Controller(ConfigHandler configHandler, RecommendationService recommendationService) {
     viewModel = new ViewModel();
-    interactor =
-        new Interactor(state -> Platform.runLater(() -> updateModel(state)), configHandler,
-            recommendationService);
+    interactor = new Interactor(state -> Platform.runLater(() -> updateModel(state)), configHandler,
+        recommendationService);
     viewBuilder = new ViewBuilder(viewModel, this::switchWorkBreak, this::saveConfig,
         this::loadConfig, this::requestBreakRecommendationNow, this::acceptBreakRecommendation,
         this::rejectBreakRecommendation);
@@ -69,6 +68,7 @@ public class Controller {
   private void updateModel(State state) {
     viewModel.setInSession(state.inSession());
     viewModel.setSessions(state.sessions());
+    viewModel.setHistory(state.history());
     viewModel.setBreakRecommendationRequested(state.breakRecommendationRequested());
     viewModel.setDialogState(state.dialogState());
   }

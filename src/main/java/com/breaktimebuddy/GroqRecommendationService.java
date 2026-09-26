@@ -6,242 +6,183 @@ import com.google.gson.JsonParser;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class GroqRecommendationService implements RecommendationService {
 
-    private static final String API_URL =
-            "https://api.groq.com/openai/v1/chat/completions";
+  private static final String API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-    private static final String MODEL =
-            "qwen/qwen3.8-27b";
+  private static final String MODEL = "qwen/qwen3.8-27b";
 
-    private static final int MAX_ATTEMPTS = 3;
-    private static final int RETRY_DELAY_SECONDS = 1;
+  private static final int MAX_ATTEMPTS = 3;
+  private static final int RETRY_DELAY_SECONDS = 1;
 
-    private final GroqHttpClient httpClient;
-    private final RecommendationService fallbackService;
-    private final String apiKey;
+  private final GroqHttpClient httpClient;
+  private final RecommendationService fallbackService;
+  private final String apiKey;
 
-    public GroqRecommendationService() {
-        this(
-                new DefaultGroqHttpClient(),
-                new FallbackRecommendationService(),
-                System.getenv("GROQ_API_KEY")
-        );
+  public GroqRecommendationService() {
+    this(new DefaultGroqHttpClient(), new FallbackRecommendationService(),
+        System.getenv("GROQ_API_KEY"));
+  }
+
+  GroqRecommendationService(GroqHttpClient httpClient, RecommendationService fallbackService,
+      String apiKey) {
+    this.httpClient = httpClient;
+    this.fallbackService = fallbackService;
+    this.apiKey = apiKey;
+  }
+
+  @Override
+  public CompletableFuture<String> getRecommendation(RecommendationRequest request) {
+    if (apiKey == null || apiKey.isBlank()) {
+      return fallbackService.getRecommendation(request);
     }
 
-    GroqRecommendationService(
-            GroqHttpClient httpClient,
-            RecommendationService fallbackService,
-            String apiKey
-    ) {
-        this.httpClient = httpClient;
-        this.fallbackService = fallbackService;
-        this.apiKey = apiKey;
-    }
+    String prompt = buildPrompt(request);
+    System.out.println(prompt);
+    String requestBody = buildRequestBody(prompt);
 
-    @Override
-    public CompletableFuture<String> getRecommendation(
-            RecommendationRequest request
-    ) {
-        if (apiKey == null || apiKey.isBlank()) {
-            return fallbackService.getRecommendation(request);
+    HttpRequest httpRequest =
+        HttpRequest.newBuilder().uri(URI.create(API_URL)).timeout(Duration.ofSeconds(10))
+            .header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody)).build();
+
+    return sendWithRetry(request, httpRequest, 1);
+  }
+
+  private CompletableFuture<String> sendWithRetry(RecommendationRequest request,
+      HttpRequest httpRequest, int attempt) {
+    return httpClient.send(httpRequest).thenCompose(response -> {
+
+      if (response.statusCode() == 200) {
+        String recommendation = extractRecommendation(response.body());
+
+        if (!isValidRecommendation(recommendation)) {
+          return fallbackService.getRecommendation(request);
         }
 
-        String prompt = buildPrompt(request);
-        String requestBody = buildRequestBody(prompt);
+        return CompletableFuture.completedFuture(recommendation);
+      }
 
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(API_URL))
-                .timeout(Duration.ofSeconds(10))
-                .header("Authorization", "Bearer " + apiKey)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
+      if (isRetryableStatus(response.statusCode()) && attempt < MAX_ATTEMPTS) {
+        return retryLater(request, httpRequest, attempt + 1);
+      }
 
-        return sendWithRetry(request, httpRequest, 1);
-    }
+      return fallbackService.getRecommendation(request);
+    }).exceptionallyCompose(error -> {
 
-    private CompletableFuture<String> sendWithRetry(
-            RecommendationRequest request,
-            HttpRequest httpRequest,
-            int attempt
-    ) {
-        return httpClient
-                .send(httpRequest)
-                .thenCompose(response -> {
+      if (attempt < MAX_ATTEMPTS) {
+        return retryLater(request, httpRequest, attempt + 1);
+      }
 
-                    if (response.statusCode() == 200) {
-                        String recommendation =
-                                extractRecommendation(response.body());
+      return fallbackService.getRecommendation(request);
+    });
+  }
 
-                        if (!isValidRecommendation(recommendation)) {
-                            return fallbackService
-                                    .getRecommendation(request);
-                        }
+  private CompletableFuture<String> retryLater(RecommendationRequest request,
+      HttpRequest httpRequest, int nextAttempt) {
+    return CompletableFuture.runAsync(() -> {
+    }, CompletableFuture.delayedExecutor(RETRY_DELAY_SECONDS, TimeUnit.SECONDS))
+        .thenCompose(ignored -> sendWithRetry(request, httpRequest, nextAttempt));
+  }
 
-                        return CompletableFuture
-                                .completedFuture(recommendation);
-                    }
+  private boolean isRetryableStatus(int statusCode) {
+    return statusCode == 429 || statusCode >= 500;
+  }
 
-                    if (isRetryableStatus(response.statusCode())
-                            && attempt < MAX_ATTEMPTS) {
-                        return retryLater(
-                                request,
-                                httpRequest,
-                                attempt + 1
-                        );
-                    }
+  private String formatDuration(Duration duration) {
+    return "%d:%02d:%02d".formatted(duration.toHours(), duration.toMinutesPart(),
+        duration.toSecondsPart());
+  }
 
-                    return fallbackService
-                            .getRecommendation(request);
-                })
-                .exceptionallyCompose(error -> {
+  private String buildPrompt(RecommendationRequest request) {
+    return """
+        You are Break Time Buddy.
 
-                    if (attempt < MAX_ATTEMPTS) {
-                        return retryLater(
-                                request,
-                                httpRequest,
-                                attempt + 1
-                        );
-                    }
+        The user has completed %d work sessions.
 
-                    return fallbackService
-                            .getRecommendation(request);
-                });
-    }
+        The user has been working continuously for %s.
 
-    private CompletableFuture<String> retryLater(
-            RecommendationRequest request,
-            HttpRequest httpRequest,
-            int nextAttempt
-    ) {
-        return CompletableFuture
-                .runAsync(
-                        () -> {
-                        },
-                        CompletableFuture.delayedExecutor(
-                                RETRY_DELAY_SECONDS,
-                                TimeUnit.SECONDS
-                        )
-                )
-                .thenCompose(ignored ->
-                        sendWithRetry(
-                                request,
-                                httpRequest,
-                                nextAttempt
-                        )
-                );
-    }
+        The following are the user's recent complete work and break sessions, \
+        in order from recent to oldest:
+        %s
 
-    private boolean isRetryableStatus(int statusCode) {
-        return statusCode == 429
-                || statusCode >= 500;
-    }
+        Recommend one short, healthy break activity.
+        Keep the response under 30 words.
+        Do not include medical advice.
+        Return only the recommendation.
+        """.formatted(request.sessions(), formatDuration(request.workingDuration()),
+        request.history().stream().map(item -> "- %s for %s".formatted(switch (item.phase()) {
+          case WORK -> "Work";
+          case BREAK -> "Break";
+        }, formatDuration(Duration.between(item.beginTime(), item.endTime()))))
+            .collect(Collectors.joining("\n")));
+  }
 
-    private String buildPrompt(
-            RecommendationRequest request
-    ) {
-        return """
-                You are Break Time Buddy.
+  private String buildRequestBody(String prompt) {
+    String escapedPrompt = escapeJson(prompt);
 
-                The user has completed %d work sessions.
-
-                Recommend one short, healthy break activity.
-                Keep the response under 30 words.
-                Do not include medical advice.
-                Return only the recommendation.
-                """.formatted(request.sessions());
-    }
-
-    private String buildRequestBody(String prompt) {
-        String escapedPrompt = escapeJson(prompt);
-
-        return """
-                {
-                  "model": "%s",
-                  "reasoning_format": "hidden",
-                  "messages": [
-                    {
-                      "role": "user",
-                      "content": "%s"
-                    }
-                  ]
-                }
-                """.formatted(MODEL, escapedPrompt);
-    }
-
-    private String extractRecommendation(
-            String responseBody
-    ) {
-        try {
-            JsonObject root =
-                    JsonParser
-                            .parseString(responseBody)
-                            .getAsJsonObject();
-
-            JsonArray choices =
-                    root.getAsJsonArray("choices");
-
-            if (choices == null || choices.isEmpty()) {
-                return null;
+    return """
+        {
+          "model": "%s",
+          "reasoning_format": "hidden",
+          "messages": [
+            {
+              "role": "user",
+              "content": "%s"
             }
-
-            JsonObject message =
-                    choices.get(0)
-                            .getAsJsonObject()
-                            .getAsJsonObject("message");
-
-            if (message == null
-                    || !message.has("content")
-                    || message.get("content").isJsonNull()) {
-                return null;
-            }
-
-            return message
-                    .get("content")
-                    .getAsString()
-                    .trim();
-
-        } catch (RuntimeException error) {
-            return null;
+          ]
         }
+        """.formatted(MODEL, escapedPrompt);
+  }
+
+  private String extractRecommendation(String responseBody) {
+    try {
+      JsonObject root = JsonParser.parseString(responseBody).getAsJsonObject();
+
+      JsonArray choices = root.getAsJsonArray("choices");
+
+      if (choices == null || choices.isEmpty()) {
+        return null;
+      }
+
+      JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
+
+      if (message == null || !message.has("content") || message.get("content").isJsonNull()) {
+        return null;
+      }
+
+      return message.get("content").getAsString().trim();
+
+    } catch (RuntimeException error) {
+      return null;
+    }
+  }
+
+  private boolean isValidRecommendation(String recommendation) {
+    if (recommendation == null || recommendation.isBlank()) {
+      return false;
     }
 
-    private boolean isValidRecommendation(
-            String recommendation
-    ) {
-        if (recommendation == null
-                || recommendation.isBlank()) {
-            return false;
-        }
+    String normalized = recommendation.trim();
 
-        String normalized =
-                recommendation.trim();
+    String lowerCase = normalized.toLowerCase(Locale.ROOT);
 
-        String lowerCase =
-                normalized.toLowerCase(Locale.ROOT);
-
-        if (lowerCase.contains("<think>")
-                || lowerCase.contains("</think>")) {
-            return false;
-        }
-
-        int wordCount =
-                normalized.split("\\s+").length;
-
-        return wordCount <= 30;
+    if (lowerCase.contains("<think>") || lowerCase.contains("</think>")) {
+      return false;
     }
 
-    private String escapeJson(String value) {
-        return value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n");
-    }
+    int wordCount = normalized.split("\\s+").length;
+
+    return wordCount <= 30;
+  }
+
+  private String escapeJson(String value) {
+    return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
+  }
 }

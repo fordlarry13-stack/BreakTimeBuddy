@@ -1,23 +1,29 @@
 package com.breaktimebuddy;
 
+import java.util.List;
 import java.time.LocalTime;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.ListProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleListProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
 
 // TODO: Rename
 public class ViewModel {
   private final BooleanProperty inSession = new SimpleBooleanProperty();
   private final ReadOnlyStringWrapper sessionStatusText = new ReadOnlyStringWrapper();
   private final IntegerProperty sessions = new SimpleIntegerProperty();
+  private final ListProperty<HistoryItem> history =
+      new SimpleListProperty<>(FXCollections.observableArrayList());
   private final BooleanProperty breakRecommendationRequested = new SimpleBooleanProperty();
   private final ObjectProperty<DialogState> dialogState = new SimpleObjectProperty<>();
   private final ObjectProperty<LocalTime> configFeedbackTimestamp = new SimpleObjectProperty<>();
@@ -57,6 +63,18 @@ public class ViewModel {
 
   public void setSessions(int sessions) {
     this.sessions.set(sessions);
+  }
+
+  public List<HistoryItem> getHistory() {
+    return history;
+  }
+
+  public ListProperty<HistoryItem> historyProperty() {
+    return history;
+  }
+
+  public void setHistory(List<HistoryItem> history) {
+    this.history.setAll(history);
   }
 
   public boolean getBreakRecommendationRequested() {
