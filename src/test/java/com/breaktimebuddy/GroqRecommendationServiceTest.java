@@ -325,7 +325,44 @@ class GroqRecommendationServiceTest {
 
         assertEquals(1, calls.get());
     }
+    
+    @Test
+    void usesFallbackWhenRecommendationContainsMedicalAdvice() {
+        GroqHttpClient client = request ->
+                CompletableFuture.completedFuture(
+                        response(
+                                200,
+                                """
+                                {
+                                  "choices": [
+                                    {
+                                      "message": {
+                                        "content": "Take ibuprofen for your headache and rest for five minutes."
+                                      }
+                                    }
+                                  ]
+                                }
+                                """
+                        )
+                );
 
+        GroqRecommendationService service =
+                new GroqRecommendationService(
+                        client,
+                        new FallbackRecommendationService(),
+                        "test-api-key"
+                );
+
+        String result = service
+                .getRecommendation(new RecommendationRequest(3))
+                .join();
+
+        assertEquals(
+                "Take a 5-minute break and stretch.",
+                result
+        );
+    }
+    
     private static HttpResponse<String> response(
             int statusCode,
             String body

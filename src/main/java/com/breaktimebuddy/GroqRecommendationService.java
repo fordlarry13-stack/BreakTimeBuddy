@@ -232,10 +232,24 @@ public class GroqRecommendationService implements RecommendationService {
             return false;
         }
 
+             if (containsMedicalAdvice(lowerCase)) {
+            return false;
+        }
+
         int wordCount =
                 normalized.split("\\s+").length;
 
         return wordCount <= 30;
+    }
+
+    private boolean containsMedicalAdvice(String lowerCase) {
+        return lowerCase.contains("ibuprofen")
+                || lowerCase.contains("aspirin")
+                || lowerCase.contains("acetaminophen")
+                || lowerCase.contains("medication")
+                || lowerCase.contains("medicine")
+                || lowerCase.contains("dosage")
+                || lowerCase.contains("dose");
     }
 
     private String escapeJson(String value) {
