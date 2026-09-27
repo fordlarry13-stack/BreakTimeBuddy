@@ -1,7 +1,8 @@
 package com.breaktimebuddy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
+import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 public class FallbackRecommendationServiceTest {
@@ -10,7 +11,9 @@ public class FallbackRecommendationServiceTest {
     void returnsShortBreakForOneSession() {
         RecommendationService service = new FallbackRecommendationService();
 
-        String result = service.getRecommendation(new RecommendationRequest(1)).join();
+        String result = service
+                .getRecommendation(new RecommendationRequest(1, Duration.ofMinutes(10), List.of()))
+                .join();
 
         assertEquals("Take a short break and rest your eyes.", result);
     }
@@ -19,7 +22,9 @@ public class FallbackRecommendationServiceTest {
     void returnsFiveMinuteBreakForThreeSessions() {
         RecommendationService service = new FallbackRecommendationService();
 
-        String result = service.getRecommendation(new RecommendationRequest(3)).join();
+        String result = service
+                .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), List.of()))
+                .join();
 
         assertEquals("Take a 5-minute break and stretch.", result);
     }
@@ -28,7 +33,9 @@ public class FallbackRecommendationServiceTest {
     void returnsTenMinuteBreakForFourSessions() {
         RecommendationService service = new FallbackRecommendationService();
 
-        String result = service.getRecommendation(new RecommendationRequest(4)).join();
+        String result = service
+                .getRecommendation(new RecommendationRequest(4, Duration.ofMinutes(10), List.of()))
+                .join();
 
         assertEquals("Take a 10-minute break. Walk around, stretch, and drink some water.", result);
     }
