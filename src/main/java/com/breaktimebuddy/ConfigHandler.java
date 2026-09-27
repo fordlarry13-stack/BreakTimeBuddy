@@ -38,7 +38,7 @@ public class ConfigHandler {
    *
    * @return a sanitized {@code ConfigData} instance deserialized from the storage
    * @throws IOException thrown when the connected {@link Storage} throws an {@code IOException}
-   * @throws JsonParseException thrown when the JSON is malformed
+   * @throws JsonParseException thrown when an error occurs during JSON parsing
    */
   public ConfigData read() throws IOException, JsonParseException {
     Gson gson = new Gson();

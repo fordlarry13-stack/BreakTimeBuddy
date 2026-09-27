@@ -22,6 +22,9 @@ import javafx.collections.FXCollections;
  *
  * Exposes observable properties bound to the view. Updated by the {@link Controller} in response to
  * {@link Interactor} state changes.
+ *
+ * The {@code configFeedbackTimestamp} and {@code configFeedbackMessage} properties display
+ * transient feedback after save/load operations (success or error messages).
  */
 public class ViewModel {
   private final BooleanProperty inSession = new SimpleBooleanProperty();
@@ -113,14 +116,29 @@ public class ViewModel {
     this.sessions.set(sessions);
   }
 
+  /**
+   * Returns the history of work and break sessions.
+   *
+   * @return the history list
+   */
   public List<HistoryItem> getHistory() {
     return history;
   }
 
+  /**
+   * Returns the property for the history of work and break sessions.
+   *
+   * @return the history property
+   */
   public ListProperty<HistoryItem> historyProperty() {
     return history;
   }
 
+  /**
+   * Sets the history of work and break sessions.
+   *
+   * @param history the history to set
+   */
   public void setHistory(List<HistoryItem> history) {
     this.history.setAll(history);
   }

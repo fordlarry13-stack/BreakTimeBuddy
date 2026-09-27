@@ -5,8 +5,8 @@ import java.util.List;
 import com.google.gson.annotations.Since;
 
 /**
- * Data transfer object that carries the number of completed sessions saved to the configuration
- * file. This class is immutable and therefore thread‑safe.
+ * Data transfer object that carries the data saved to the configuration file. This class is
+ * immutable and therefore thread‑safe.
  *
  * The default values set in {@link #sanitize(ConfigData)} are also used as the initial values in
  * {@link Interactor}.
@@ -55,6 +55,16 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) List<HistoryItem>
       return new HistoryItem(phase, item.beginTime, item.endTime);
     }
 
+    /**
+     * Validates and sanitizes the given data, correcting missing, invalid, or inconsistent data,
+     * and logs any errors to the console. Missing fields are filled with the default values.
+     * Invalid or inconsistent data is fixed whenever possible; unfixable errors are removed and
+     * replaced with the default values. If the whole data is not fixable, then returns
+     * {@code null}.
+     *
+     * @param item the data to be sanitized; if null, the default data is returned
+     * @return a copy of the data after sanitization, or null if the item cannot be fixed
+     */
     public static HistoryItem trySanitize(HistoryItem item) {
       return trySanitize(item, true);
     }
@@ -111,6 +121,8 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) List<HistoryItem>
 
   /**
    * Returns a default {@code ConfigData} instance.
+   *
+   * @return a ConfigData with zero sessions and empty history
    */
   public static ConfigData getDefault() {
     return sanitize(null, false);

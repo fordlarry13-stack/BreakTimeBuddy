@@ -74,7 +74,8 @@ public class Interactor {
 
   /**
    * Toggles between work and break sessions. Increments the session count when ending a work
-   * session and notifies the state change listener.
+   * session, finalizes the current history item, creates a new open history item for the next
+   * session, and notifies the state change listener.
    */
   public void switchWorkBreak() {
     if (inSession)
@@ -109,7 +110,7 @@ public class Interactor {
    * Loads the session count from persistent storage and updates the state.
    *
    * @throws IOException thrown if an I/O error occurs during read
-   * @throws JsonSyntaxException thrown if the configuration file contains invalid JSON
+   * @throws JsonParseException thrown if the configuration file contains invalid JSON
    */
   public void loadConfig() throws IOException, JsonParseException {
     spreadConfigData(configHandler.read());
@@ -163,7 +164,8 @@ public class Interactor {
   /**
    * Accepts a break recommendation, ending the current work session and starting a break.
    *
-   * @param messageId the ID of the recommendation
+   * @param messageId the ID of the recommendation; if it doesn't match the current recommendation,
+   *     the call is silently ignored
    */
   public void acceptBreakRecommendation(UUID messageId) {
     breakRecommendationState.updateAndGet(state -> {
@@ -179,7 +181,8 @@ public class Interactor {
   /**
    * Rejects a break recommendation, dismissing it without starting a break.
    *
-   * @param messageId the ID of the recommendation
+   * @param messageId the ID of the recommendation; if it doesn't match the current recommendation,
+   *     the call is silently ignored
    */
   public void rejectBreakRecommendation(UUID messageId) {
     breakRecommendationState.updateAndGet(state -> {
