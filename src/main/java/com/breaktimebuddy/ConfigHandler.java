@@ -8,7 +8,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonSyntaxException;
+import com.google.gson.JsonParseException;
 
 /**
  * Handles (de)serialization and sanitization of user configuration data as JSON from a
@@ -38,9 +38,9 @@ public class ConfigHandler {
    *
    * @return a sanitized {@code ConfigData} instance deserialized from the storage
    * @throws IOException thrown when the connected {@link Storage} throws an {@code IOException}
-   * @throws JsonSyntaxException thrown when the JSON is malformed
+   * @throws JsonParseException thrown when the JSON is malformed
    */
-  public ConfigData read() throws IOException, JsonSyntaxException {
+  public ConfigData read() throws IOException, JsonParseException {
     Gson gson = new Gson();
     try (InputStream in = storage.in();
         var reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {

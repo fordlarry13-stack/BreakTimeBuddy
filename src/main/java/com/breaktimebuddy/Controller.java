@@ -85,6 +85,7 @@ public class Controller {
   private void updateModel(State state) {
     viewModel.setInSession(state.inSession());
     viewModel.setSessions(state.sessions());
+    viewModel.setHistory(state.history());
     viewModel.setBreakRecommendationRequested(state.breakRecommendationRequested());
     viewModel.setDialogState(state.dialogState());
   }

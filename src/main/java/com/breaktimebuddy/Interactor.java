@@ -1,12 +1,16 @@
 package com.breaktimebuddy;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import com.google.gson.JsonSyntaxException;
+import com.google.gson.JsonParseException;
 
 /**
  * Core business logic for the application.
@@ -27,6 +31,10 @@ public class Interactor {
 
   private boolean inSession;
   private int sessions;
+  private static final int HISTORY_LENGTH = 20;
+  /** Newest first */
+  private LinkedList<HistoryItem> history = new LinkedList<>();
+  private HistoryItem.Open nextHistoryItem;
   private AtomicBoolean breakRecommendationRequested = new AtomicBoolean();
   private CompletableFuture<String> currentBreakRecommendationFuture;
   private AtomicReference<BreakRecommendationState> breakRecommendationState =
@@ -59,8 +67,8 @@ public class Interactor {
     if (stateChangeListener == null)
       return;
     BreakRecommendationState breakRecommendationState = this.breakRecommendationState.get();
-    stateChangeListener.accept(new State(inSession, sessions, breakRecommendationRequested.get(),
-        breakRecommendationState == null ? null
+    stateChangeListener.accept(new State(inSession, sessions, List.copyOf(history),
+        breakRecommendationRequested.get(), breakRecommendationState == null ? null
             : new DialogState(breakRecommendationState.id(), breakRecommendationState.message())));
   }
 
@@ -72,6 +80,14 @@ public class Interactor {
     if (inSession)
       sessions++;
     setInSession(!inSession);
+    Instant current = Instant.now();
+    if (nextHistoryItem != null && nextHistoryItem.beginTime().isBefore(current)) {
+      if (history.size() >= HISTORY_LENGTH)
+        history.removeLast();
+      history.addFirst(nextHistoryItem.close(current));
+    }
+    nextHistoryItem =
+        HistoryItem.open(inSession ? HistoryItem.Phase.WORK : HistoryItem.Phase.BREAK, current);
     notifyStateChange();
   }
 
@@ -81,7 +97,11 @@ public class Interactor {
    * @throws IOException thrown if an I/O error occurs during write
    */
   public void saveConfig() throws IOException {
-    ConfigData data = new ConfigData(sessions);
+    ConfigData data = new ConfigData(sessions,
+        history.stream().map(e -> new ConfigData.HistoryItem(switch (e.phase()) {
+          case WORK -> ConfigData.HistoryItem.Phase.WORK;
+          case BREAK -> ConfigData.HistoryItem.Phase.BREAK;
+        }, e.beginTime(), e.endTime())).toList());
     configHandler.write(data);
   }
 
@@ -91,12 +111,17 @@ public class Interactor {
    * @throws IOException thrown if an I/O error occurs during read
    * @throws JsonSyntaxException thrown if the configuration file contains invalid JSON
    */
-  public void loadConfig() throws IOException, JsonSyntaxException {
+  public void loadConfig() throws IOException, JsonParseException {
     spreadConfigData(configHandler.read());
   }
 
   private void spreadConfigData(ConfigData data) {
     sessions = data.sessions();
+    history.clear();
+    history.addAll(data.history().stream().map(e -> HistoryItem.open(switch (e.phase()) {
+      case WORK -> HistoryItem.Phase.WORK;
+      case BREAK -> HistoryItem.Phase.BREAK;
+    }, e.beginTime()).close(e.endTime())).limit(HISTORY_LENGTH).toList());
     notifyStateChange();
   }
 
@@ -114,7 +139,8 @@ public class Interactor {
     if (!breakRecommendationRequested.compareAndSet(false, true))
       return;
     CompletableFuture<String> future =
-        recommendationService.getRecommendation(new RecommendationRequest(sessions));
+        recommendationService.getRecommendation(new RecommendationRequest(sessions,
+            Duration.between(nextHistoryItem.beginTime(), Instant.now()), List.copyOf(history)));
     currentBreakRecommendationFuture = future;
     future.whenComplete((message, error) -> {
       if (future != currentBreakRecommendationFuture)

@@ -1,5 +1,7 @@
 package com.breaktimebuddy;
 
+import java.util.List;
+
 /**
  * Public inner state snapshot.
  *
@@ -10,6 +12,6 @@ package com.breaktimebuddy;
  * <li>{@code dialogState} - the current dialog state, or null if none
  * </ul>
  */
-public record State(boolean inSession, int sessions, boolean breakRecommendationRequested,
-    DialogState dialogState) {
+public record State(boolean inSession, int sessions, List<HistoryItem> history,
+    boolean breakRecommendationRequested, DialogState dialogState) {
 }
