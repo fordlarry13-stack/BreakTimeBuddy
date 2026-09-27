@@ -1,3 +1,5 @@
 package com.breaktimebuddy;
 
-public record RecommendationRequest(int sessions){}
+/** Request object containing context for a break recommendation. */
+public record RecommendationRequest(int sessions) {
+}
