@@ -16,8 +16,7 @@ public class DialogDisplay extends VBox {
   private final ObjectProperty<DialogState> dialogState = new SimpleObjectProperty<>();
   private final Label breakRecommendationLabel = new Label();
 
-  public DialogDisplay(Runnable requestBreakRecommendationNow, Runnable acceptBreakRecommendation,
-      Runnable rejectBreakRecommendation) {
+  public DialogDisplay(Runnable acceptBreakRecommendation, Runnable rejectBreakRecommendation) {
     super();
     dialogState.addListener((_0, _1, value) -> handleDialogStateChange(value));
     handleDialogStateChange(getDialogState());

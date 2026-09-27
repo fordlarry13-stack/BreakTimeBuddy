@@ -44,8 +44,7 @@ public class ViewBuilder implements Builder<Region> {
     Button requestBreakRecommendationNowButton = new Button("Request break recommendation now");
     requestBreakRecommendationNowButton.setOnAction(e -> requestBreakRecommendationNow.run());
     DialogDisplay dialogDisplay;
-    dialogDisplay = new DialogDisplay(requestBreakRecommendationNow, acceptBreakRecommendation,
-        rejectBreakRecommendation);
+    dialogDisplay = new DialogDisplay(acceptBreakRecommendation, rejectBreakRecommendation);
     dialogDisplay.dialogStateProperty().bind(viewModel.dialogStateProperty());
     Label configFeedbackLabel = new Label();
     configFeedbackLabel.textProperty()
