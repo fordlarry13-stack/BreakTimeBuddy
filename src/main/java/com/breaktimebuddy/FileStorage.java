@@ -19,11 +19,11 @@ public class FileStorage implements Storage {
    * Creates an instance backed by the {@link File} instance.
    *
    * @param file the file to use for storage
-   * @throws NullPointerException if file is null
+   * @throws IllegalArgumentException thrown when file is null
    */
   public FileStorage(File file) {
     if (file == null)
-      throw new NullPointerException("file cannot be null");
+      throw new IllegalArgumentException("file cannot be null");
     this.file = file;
   }
 
