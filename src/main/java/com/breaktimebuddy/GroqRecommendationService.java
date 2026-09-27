@@ -185,10 +185,22 @@ public class GroqRecommendationService implements RecommendationService {
   }
 
   private boolean containsMedicalAdvice(String lowerCase) {
-    return lowerCase.contains("ibuprofen") || lowerCase.contains("aspirin")
-        || lowerCase.contains("acetaminophen") || lowerCase.contains("medication")
-        || lowerCase.contains("medicine") || lowerCase.contains("dosage")
-        || lowerCase.contains("dose");
+    return lowerCase.contains("ibuprofen")
+        || lowerCase.contains("aspirin")
+        || lowerCase.contains("acetaminophen")
+        || lowerCase.contains("medication")
+        || lowerCase.contains("medicine")
+        || lowerCase.contains("dosage")
+        || lowerCase.contains("dose")
+        || lowerCase.contains("diagnose")
+        || lowerCase.contains("diagnosis")
+        || lowerCase.contains("treatment")
+        || lowerCase.contains("prescription")
+        || lowerCase.contains("prescribe")
+        || lowerCase.contains("take a pain reliever")
+        || lowerCase.contains("take pain reliever")
+        || lowerCase.contains("stop taking")
+        || lowerCase.contains("start taking");
   }
 
   private String escapeJson(String value) {
