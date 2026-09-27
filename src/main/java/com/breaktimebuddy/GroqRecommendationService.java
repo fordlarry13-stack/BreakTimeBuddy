@@ -44,7 +44,6 @@ public class GroqRecommendationService implements RecommendationService {
     }
 
     String prompt = buildPrompt(request);
-    System.out.println(prompt);
     String requestBody = buildRequestBody(prompt);
 
     HttpRequest httpRequest =
