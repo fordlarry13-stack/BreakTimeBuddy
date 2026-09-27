@@ -1,6 +1,7 @@
 package com.breaktimebuddy;
 
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.scene.control.Button;
@@ -82,6 +83,14 @@ public class ViewBuilder implements Builder<Region> {
     }
     HBox preferredWorkLengthContainer = new HBox(preferredWorkLengthLabel,
         preferredWorkLengthSpinner, preferredWorkLengthLabelAfter);
+    Label historyLabel = new Label();
+    historyLabel.textProperty()
+        .bind(Bindings.createStringBinding(
+            () -> String.format("History (%d):\n", viewModel.getHistory().size())
+                + viewModel.getHistory().stream()
+                    .map(e -> String.format("%s %s %s", e.phase(), e.beginTime(), e.endTime()))
+                    .collect(Collectors.joining("\n")),
+            viewModel.historyProperty()));
     Label breakRecommendationRequestedLabel = new Label();
     breakRecommendationRequestedLabel.textProperty().bind(Bindings.format(
         "Pending break recommendation: %s", viewModel.breakRecommendationRequestedProperty()));
@@ -104,7 +113,7 @@ public class ViewBuilder implements Builder<Region> {
     Button loadConfigButton = new Button("Load config");
     loadConfigButton.setOnAction(e -> loadConfig.run());
     root.getChildren().addAll(title, sessionToggleButton, sessionsLabel,
-        preferredWorkLengthContainer, breakRecommendationRequestedLabel,
+        preferredWorkLengthContainer, historyLabel, breakRecommendationRequestedLabel,
         requestBreakRecommendationNowButton, dialogDisplay, saveConfigButton, loadConfigButton,
         configFeedbackLabel);
     return root;

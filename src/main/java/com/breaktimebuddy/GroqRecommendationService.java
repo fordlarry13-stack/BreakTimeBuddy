@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class GroqRecommendationService implements RecommendationService {
 
@@ -102,13 +103,27 @@ public class GroqRecommendationService implements RecommendationService {
     return """
         You are Break Time Buddy.
 
-        The user has completed %d work sessions. Their preferred work session length is %s.
+        The user has completed %d work sessions.
+
+        Their preferred work session length is %s.
+
+        The user has been working continuously for %s.
+
+        The following are the user's recent complete work and break sessions, \
+        in order from recent to oldest:
+        %s
 
         Recommend one short, healthy break activity.
         Keep the response under 30 words.
         Do not include medical advice.
         Return only the recommendation.
-        """.formatted(request.sessions(), formatDuration(request.preferredWorkLength()));
+        """.formatted(request.sessions(), formatDuration(request.preferredWorkLength()),
+        formatDuration(request.workingDuration()),
+        request.history().stream().map(item -> "- %s for %s".formatted(switch (item.phase()) {
+          case WORK -> "Work";
+          case BREAK -> "Break";
+        }, formatDuration(Duration.between(item.beginTime(), item.endTime()))))
+            .collect(Collectors.joining("\n")));
   }
 
   private String buildRequestBody(String prompt) {

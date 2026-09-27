@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
@@ -17,9 +18,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import com.google.gson.JsonSyntaxException;
+import com.google.gson.JsonParseException;
 
 class InteractorTest {
+  private static final List<HistoryItem> testHistory = List.of(
+      HistoryItem.open(HistoryItem.Phase.WORK, Instant.ofEpochSecond(1, 2))
+          .close(Instant.ofEpochSecond(3, 4)),
+      HistoryItem.open(HistoryItem.Phase.BREAK, Instant.ofEpochSecond(5, 6))
+          .close(Instant.ofEpochSecond(7, 8)));
+  private static final List<ConfigData.HistoryItem> testHistoryData = List.of(
+      new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK, Instant.ofEpochSecond(1, 2),
+          Instant.ofEpochSecond(3, 4)),
+      new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.BREAK, Instant.ofEpochSecond(5, 6),
+          Instant.ofEpochSecond(7, 8)));
+
   private StateChangeCaptor stateChangeCaptor;
   private FakeConfigHandler configHandler;
   private FakeRecommendationService recommendationService;
@@ -33,6 +45,19 @@ class InteractorTest {
     interactor = new Interactor(stateChangeCaptor, configHandler, recommendationService);
   }
 
+  /**
+   * Call {@link Interactor#switchWorkBreak}, then add a small delay. This is needed so session
+   * start and end times are distinct.
+   */
+  void switchWorkBreakAndDelay() {
+    interactor.switchWorkBreak();
+    try {
+      Thread.sleep(1);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+
   @Test
   void testInitialState() {
     // Initially not in session
@@ -41,27 +66,50 @@ class InteractorTest {
     assertEquals(0, state.sessions());
     assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
         PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), state.preferredWorkLength());
+    assertEquals(List.of(), state.history());
   }
 
   @Test
   void testSwitchWorkBreakStartsSession() {
     // Toggle to start session
-    interactor.switchWorkBreak();
-    // Should now be in session, sessions count unchanged (still 0)
+    switchWorkBreakAndDelay();
+    // Should nswitchWorkBreakAndDelayow be in session, sessions count unchanged (still 0)
     State state = stateChangeCaptor.lastState;
     assertTrue(state.inSession());
     assertEquals(0, state.sessions());
+    assertEquals(List.of(), state.history());
   }
 
   @Test
   void testSwitchWorkBreakEndsSessionIncrementsCount() {
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     // End the session (switchWorkBreak when in session)
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     // Sessions incremented when ending
     State state = stateChangeCaptor.lastState;
     assertFalse(state.inSession());
     assertEquals(1, state.sessions());
+    assertEquals(1, state.history().size());
+    assertEquals(HistoryItem.Phase.WORK, state.history().get(0).phase());
+  }
+
+  @Test
+  void testSwitchWorkBreakRemovesOldestItemOfLongHistory() throws InterruptedException {
+    final int HISTORY_LENGTH = 20;
+    // Fill the history
+    for (int i = 0; i < HISTORY_LENGTH + 1; i++)
+      switchWorkBreakAndDelay();
+
+    State state = stateChangeCaptor.lastState;
+    HistoryItem lastHistoryItem = state.history().get(state.history().size() - 1);
+    assertEquals(HISTORY_LENGTH, state.history().size());
+    assertTrue(state.history().contains(lastHistoryItem));
+
+    switchWorkBreakAndDelay();
+
+    state = stateChangeCaptor.lastState;
+    assertEquals(HISTORY_LENGTH, state.history().size());
+    assertFalse(state.history().contains(lastHistoryItem));
   }
 
   @Test
@@ -90,20 +138,28 @@ class InteractorTest {
   void testSaveConfigCallsConfigHandlerWrite() throws IOException {
     // Set up state: end 3 sessions
     for (int i = 0; i < 6; i++)
-      interactor.switchWorkBreak();
+      switchWorkBreakAndDelay();
     interactor.saveConfig();
     ConfigData data = configHandler.getLastDataWritten();
     assertNotNull(data);
     assertEquals(3, data.sessions());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), data.preferredWorkLength());
+    assertEquals(5, data.history().size());
+    for (int i = 0; i < 5; i++)
+      assertEquals(
+          i % 2 == 0 ? ConfigData.HistoryItem.Phase.WORK : ConfigData.HistoryItem.Phase.BREAK,
+          data.history().get(i).phase());
   }
 
   @Test
-  void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonSyntaxException {
-    configHandler.setDataToReturn(new ConfigData(7, Duration.of(10, ChronoUnit.MINUTES)));
+  void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonParseException {
+    configHandler.setDataToReturn(new ConfigData(7, Duration.of(10, ChronoUnit.MINUTES), testHistoryData));
     interactor.loadConfig();
     State state = stateChangeCaptor.lastState;
     assertEquals(7, state.sessions());
     assertEquals(Duration.of(10, ChronoUnit.MINUTES), state.preferredWorkLength());
+    assertIterableEquals(testHistory, state.history());
   }
 
   @Test
@@ -119,14 +175,14 @@ class InteractorTest {
   }
 
   @Test
-  void testLoadConfigThrowsJsonSyntaxExceptionWhenConfigHandlerThrowsJsonSyntaxException() {
-    configHandler.setThrowOnReadJsonSyntaxException(true);
-    assertThrows(JsonSyntaxException.class, () -> interactor.loadConfig());
+  void testLoadConfigThrowsJsonParseExceptionWhenConfigHandlerThrowsJsonParseException() {
+    configHandler.setThrowOnReadJsonParseException(true);
+    assertThrows(JsonParseException.class, () -> interactor.loadConfig());
   }
 
   @Test
   void testRecommendationRequestInvokesServiceAndDisplaysResult() {
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
 
     interactor.requestBreakRecommendationNow();
 
@@ -144,7 +200,7 @@ class InteractorTest {
 
   @Test
   void testRecommendationFailureClearsRequestWithoutOpeningDialog() {
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     interactor.requestBreakRecommendationNow();
 
     recommendationService.future.completeExceptionally(new RuntimeException("Simulated error"));
@@ -157,10 +213,10 @@ class InteractorTest {
   @Test
   void testStaleRecommendationDoesNotReopenDialogAfterManualSwitch() {
     recommendationService.future = new NonCancellableFuture();
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     interactor.requestBreakRecommendationNow();
 
-    interactor.switchWorkBreak();
+    switchWorkBreakAndDelay();
     recommendationService.future.complete("Stale recommendation");
 
     State state = stateChangeCaptor.lastState;
@@ -202,7 +258,7 @@ class InteractorTest {
   private static class FakeConfigHandler extends ConfigHandler {
     private ConfigData dataToReturn;
     private boolean throwOnReadIOException;
-    private boolean throwOnReadJsonSyntaxException;
+    private boolean throwOnReadJsonParseException;
     private boolean throwOnWrite;
     private ConfigData lastDataWritten;
 
@@ -218,7 +274,6 @@ class InteractorTest {
           throw new UnsupportedOperationException("Unimplemented method 'out'");
         }
       }); // Anonymous subclass, won't be used
-      this.dataToReturn = new ConfigData(0, Duration.ZERO);
     }
 
     public void setDataToReturn(ConfigData data) {
@@ -233,8 +288,8 @@ class InteractorTest {
       this.throwOnReadIOException = value;
     }
 
-    public void setThrowOnReadJsonSyntaxException(boolean value) {
-      this.throwOnReadJsonSyntaxException = value;
+    public void setThrowOnReadJsonParseException(boolean value) {
+      this.throwOnReadJsonParseException = value;
     }
 
     public void setThrowOnWrite(boolean value) {
@@ -242,11 +297,13 @@ class InteractorTest {
     }
 
     @Override
-    public ConfigData read() throws IOException, JsonSyntaxException {
+    public ConfigData read() throws IOException, JsonParseException {
       if (throwOnReadIOException)
         throw new IOException("Simulated read error");
-      if (throwOnReadJsonSyntaxException)
-        throw new JsonSyntaxException("Simulated read error");
+      if (throwOnReadJsonParseException)
+        throw new JsonParseException("Simulated read error");
+      if (dataToReturn == null)
+        throw new IllegalStateException("dataToReturn can not be null");
       return dataToReturn;
     }
 

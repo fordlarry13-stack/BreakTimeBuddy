@@ -77,6 +77,7 @@ public class Controller {
     viewModel.setPreferredWorkLength(state.preferredWorkLength());
     if (interactor == null)
       viewModel.setDefaultPreferredWorkLength(state.preferredWorkLength());
+    viewModel.setHistory(state.history());
     viewModel.setBreakRecommendationRequested(state.breakRecommendationRequested());
     viewModel.setDialogState(state.dialogState());
   }
