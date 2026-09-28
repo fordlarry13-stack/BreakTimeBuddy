@@ -41,7 +41,7 @@ Rule-based break recommendation
 The Alpha implementation uses Groq with the following model:
 
 ```text
-qwen/qwen3.8
+qwen/qwen3.8-27b
 ```
 
 The Groq API key is read from the `GROQ_API_KEY` environment variable.
@@ -104,7 +104,7 @@ mvn clean test
 During Alpha development, the verified result was:
 
 ```text
-Tests run: 34
+Tests run: 42
 Failures: 0
 Errors: 0
 Skipped: 0
@@ -183,46 +183,46 @@ This prevents an AI provider failure from breaking the core recommendation featu
 
 ### 1. Direct Desktop-to-AI Communication
 
-**Technical debt:**  
+**Technical debt:**
 For the Alpha release, the Java desktop application communicates directly with the Groq API.
 
-**Impact:**  
+**Impact:**
 A distributed desktop application cannot securely protect a provider API key in a production environment.
 
-**Potential resolution:**  
+**Potential resolution:**
 Move AI communication to a backend or proxy service. The backend would securely store the provider credential, while the JavaFX client would communicate only with the application's backend.
 
 ### 2. Fixed Retry Delay
 
-**Technical debt:**  
+**Technical debt:**
 The current implementation uses a fixed one-second delay between retry attempts.
 
-**Impact:**  
+**Impact:**
 A fixed delay may not be optimal during rate limiting or longer provider outages.
 
-**Potential resolution:**  
+**Potential resolution:**
 Implement exponential backoff and support the provider's `Retry-After` information when available.
 
 ### 3. Limited Recommendation Inputs
 
-**Technical debt:**  
+**Technical debt:**
 The current recommendation request primarily uses completed session count.
 
-**Impact:**  
+**Impact:**
 The AI has limited information available for personalization.
 
-**Potential resolution:**  
+**Potential resolution:**
 Expand `RecommendationRequest` to include relevant information such as break preferences, work-session duration, and recent break history as those modules become available.
 
 ### 4. Basic AI Response Validation
 
-**Technical debt:**  
+**Technical debt:**
 Current validation focuses mainly on response format and length.
 
-**Impact:**  
+**Impact:**
 It does not perform advanced semantic evaluation of every recommendation.
 
-**Potential resolution:**  
+**Potential resolution:**
 Add stronger validation and testing for recommendation relevance, safety, and consistency.
 
 ## Alpha Status

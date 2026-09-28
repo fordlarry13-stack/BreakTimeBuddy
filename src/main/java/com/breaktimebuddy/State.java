@@ -1,5 +1,6 @@
 package com.breaktimebuddy;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -11,6 +12,6 @@ import java.util.List;
  * @param breakRecommendationRequested whether a break recommendation is pending
  * @param dialogState the current dialog state, or null if none
  */
-public record State(boolean inSession, int sessions, List<HistoryItem> history,
-    boolean breakRecommendationRequested, DialogState dialogState) {
+public record State(boolean inSession, int sessions, Duration preferredWorkLength,
+    List<HistoryItem> history, boolean breakRecommendationRequested, DialogState dialogState) {
 }

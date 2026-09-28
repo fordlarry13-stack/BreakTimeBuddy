@@ -10,6 +10,6 @@ import java.util.List;
  * @param sessions the number of completed sessions
  * @param history the records of recent completed sessions
  */
-public record RecommendationRequest(int sessions, Duration workingDuration,
-    List<HistoryItem> history) {
+public record RecommendationRequest(int sessions, Duration preferredWorkLength,
+    Duration workingDuration, List<HistoryItem> history) {
 }

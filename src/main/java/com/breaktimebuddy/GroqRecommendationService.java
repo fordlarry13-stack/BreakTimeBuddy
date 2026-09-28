@@ -122,6 +122,8 @@ public class GroqRecommendationService implements RecommendationService {
 
         The user has completed %d work sessions.
 
+        Their preferred work session length is %s.
+
         The user has been working continuously for %s.
 
         The following are the user's recent complete work and break sessions, \
@@ -132,7 +134,8 @@ public class GroqRecommendationService implements RecommendationService {
         Keep the response under 30 words.
         Do not include medical advice.
         Return only the recommendation.
-        """.formatted(request.sessions(), formatDuration(request.workingDuration()),
+        """.formatted(request.sessions(), formatDuration(request.preferredWorkLength()),
+        formatDuration(request.workingDuration()),
         request.history().stream().map(item -> "- %s for %s".formatted(switch (item.phase()) {
           case WORK -> "Work";
           case BREAK -> "Break";
@@ -186,16 +189,38 @@ public class GroqRecommendationService implements RecommendationService {
     }
 
     String normalized = recommendation.trim();
-
     String lowerCase = normalized.toLowerCase(Locale.ROOT);
 
     if (lowerCase.contains("<think>") || lowerCase.contains("</think>")) {
       return false;
     }
 
+    if (containsMedicalAdvice(lowerCase)) {
+      return false;
+    }
+
     int wordCount = normalized.split("\\s+").length;
 
     return wordCount <= 30;
+  }
+
+  private boolean containsMedicalAdvice(String lowerCase) {
+    return lowerCase.contains("ibuprofen")
+        || lowerCase.contains("aspirin")
+        || lowerCase.contains("acetaminophen")
+        || lowerCase.contains("medication")
+        || lowerCase.contains("medicine")
+        || lowerCase.contains("dosage")
+        || lowerCase.contains("dose")
+        || lowerCase.contains("diagnose")
+        || lowerCase.contains("diagnosis")
+        || lowerCase.contains("treatment")
+        || lowerCase.contains("prescription")
+        || lowerCase.contains("prescribe")
+        || lowerCase.contains("take a pain reliever")
+        || lowerCase.contains("take pain reliever")
+        || lowerCase.contains("stop taking")
+        || lowerCase.contains("start taking");
   }
 
   private String escapeJson(String value) {

@@ -31,6 +31,7 @@ public class Interactor {
 
   private boolean inSession;
   private int sessions;
+  private Duration preferredWorkLength;
   private static final int HISTORY_LENGTH = 20;
   /** Newest first */
   private LinkedList<HistoryItem> history = new LinkedList<>();
@@ -63,12 +64,24 @@ public class Interactor {
     }
   }
 
+  public void setPreferredWorkLength(Duration preferredWorkLength) {
+    this.preferredWorkLength =
+        preferredWorkLength == null ? ConfigData.getDefault().preferredWorkLength()
+            : PreferencesHelper.defaultClampAndQuantize(preferredWorkLength,
+                PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+                PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
+                PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
+                PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    notifyStateChange();
+  }
+
   private void notifyStateChange() {
     if (stateChangeListener == null)
       return;
     BreakRecommendationState breakRecommendationState = this.breakRecommendationState.get();
-    stateChangeListener.accept(new State(inSession, sessions, List.copyOf(history),
-        breakRecommendationRequested.get(), breakRecommendationState == null ? null
+    stateChangeListener.accept(new State(inSession, sessions, preferredWorkLength,
+        List.copyOf(history), breakRecommendationRequested.get(),
+        breakRecommendationState == null ? null
             : new DialogState(breakRecommendationState.id(), breakRecommendationState.message())));
   }
 
@@ -98,7 +111,7 @@ public class Interactor {
    * @throws IOException thrown if an I/O error occurs during write
    */
   public void saveConfig() throws IOException {
-    ConfigData data = new ConfigData(sessions,
+    ConfigData data = new ConfigData(sessions, preferredWorkLength,
         history.stream().map(e -> new ConfigData.HistoryItem(switch (e.phase()) {
           case WORK -> ConfigData.HistoryItem.Phase.WORK;
           case BREAK -> ConfigData.HistoryItem.Phase.BREAK;
@@ -118,6 +131,7 @@ public class Interactor {
 
   private void spreadConfigData(ConfigData data) {
     sessions = data.sessions();
+    preferredWorkLength = data.preferredWorkLength();
     history.clear();
     history.addAll(data.history().stream().map(e -> HistoryItem.open(switch (e.phase()) {
       case WORK -> HistoryItem.Phase.WORK;
@@ -141,7 +155,8 @@ public class Interactor {
       return;
     CompletableFuture<String> future =
         recommendationService.getRecommendation(new RecommendationRequest(sessions,
-            Duration.between(nextHistoryItem.beginTime(), Instant.now()), List.copyOf(history)));
+            preferredWorkLength, Duration.between(nextHistoryItem.beginTime(), Instant.now()),
+            List.copyOf(history)));
     currentBreakRecommendationFuture = future;
     future.whenComplete((message, error) -> {
       if (future != currentBreakRecommendationFuture)

@@ -12,7 +12,8 @@ public class FallbackRecommendationServiceTest {
         RecommendationService service = new FallbackRecommendationService();
 
         String result = service
-                .getRecommendation(new RecommendationRequest(1, Duration.ofMinutes(10), List.of()))
+                .getRecommendation(new RecommendationRequest(
+                        1, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
                 .join();
 
         assertEquals("Take a short break and rest your eyes.", result);
@@ -23,7 +24,8 @@ public class FallbackRecommendationServiceTest {
         RecommendationService service = new FallbackRecommendationService();
 
         String result = service
-                .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), List.of()))
+                .getRecommendation(new RecommendationRequest(
+                        3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
                 .join();
 
         assertEquals("Take a 5-minute break and stretch.", result);
@@ -34,7 +36,8 @@ public class FallbackRecommendationServiceTest {
         RecommendationService service = new FallbackRecommendationService();
 
         String result = service
-                .getRecommendation(new RecommendationRequest(4, Duration.ofMinutes(10), List.of()))
+                .getRecommendation(new RecommendationRequest(
+                        4, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
                 .join();
 
         assertEquals("Take a 10-minute break. Walk around, stretch, and drink some water.", result);

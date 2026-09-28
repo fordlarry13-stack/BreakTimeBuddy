@@ -5,12 +5,15 @@ Partially AI-generated: Test cases
 package com.breaktimebuddy;
 
 import static org.junit.jupiter.api.Assertions.*;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +64,8 @@ class InteractorTest {
     State state = stateChangeCaptor.lastState;
     assertFalse(state.inSession());
     assertEquals(0, state.sessions());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), state.preferredWorkLength());
     assertEquals(List.of(), state.history());
   }
 
@@ -108,6 +113,28 @@ class InteractorTest {
   }
 
   @Test
+  void testSetPreferredWorkLength() {
+    Duration min = Duration.of(PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    Duration max = Duration.of(PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    List<Duration> inputs = Arrays.asList(Duration.of(20, ChronoUnit.MINUTES), null,
+        min.dividedBy(2), max.multipliedBy(2), min);
+    List<Duration> expected = Arrays.asList(Duration.of(20, ChronoUnit.MINUTES),
+        Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+            PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH),
+        min, max, min);
+    List<Duration> outputs = inputs.stream().map(e -> {
+      interactor.setPreferredWorkLength(e);
+      return stateChangeCaptor.lastState.preferredWorkLength();
+    }).toList();
+    for (int i = 0; i < outputs.size(); i++) {
+      assertNotNull(outputs.get(i), String.valueOf(i));
+    }
+    assertIterableEquals(expected, outputs);
+  }
+
+  @Test
   void testSaveConfigCallsConfigHandlerWrite() throws IOException {
     // Set up state: end 3 sessions
     for (int i = 0; i < 6; i++)
@@ -116,6 +143,8 @@ class InteractorTest {
     ConfigData data = configHandler.getLastDataWritten();
     assertNotNull(data);
     assertEquals(3, data.sessions());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), data.preferredWorkLength());
     assertEquals(5, data.history().size());
     for (int i = 0; i < 5; i++)
       assertEquals(
@@ -125,10 +154,11 @@ class InteractorTest {
 
   @Test
   void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonParseException {
-    configHandler.setDataToReturn(new ConfigData(7, testHistoryData));
+    configHandler.setDataToReturn(new ConfigData(7, Duration.of(10, ChronoUnit.MINUTES), testHistoryData));
     interactor.loadConfig();
     State state = stateChangeCaptor.lastState;
     assertEquals(7, state.sessions());
+    assertEquals(Duration.of(10, ChronoUnit.MINUTES), state.preferredWorkLength());
     assertIterableEquals(testHistory, state.history());
   }
 
@@ -160,7 +190,7 @@ class InteractorTest {
     assertEquals(0, recommendationService.lastRequest.sessions());
     assertTrue(stateChangeCaptor.lastState.breakRecommendationRequested());
 
-    recommendationService.future.complete("Take a short walk and stretch.");
+    recommendationService.lastFuture.complete("Take a short walk and stretch.");
 
     State state = stateChangeCaptor.lastState;
     assertFalse(state.breakRecommendationRequested());
@@ -173,7 +203,7 @@ class InteractorTest {
     switchWorkBreakAndDelay();
     interactor.requestBreakRecommendationNow();
 
-    recommendationService.future.completeExceptionally(new RuntimeException("Simulated error"));
+    recommendationService.lastFuture.completeExceptionally(new RuntimeException("Simulated error"));
 
     State state = stateChangeCaptor.lastState;
     assertFalse(state.breakRecommendationRequested());
@@ -182,15 +212,124 @@ class InteractorTest {
 
   @Test
   void testStaleRecommendationDoesNotReopenDialogAfterManualSwitch() {
-    recommendationService.future = new NonCancellableFuture();
     switchWorkBreakAndDelay();
     interactor.requestBreakRecommendationNow();
 
     switchWorkBreakAndDelay();
-    recommendationService.future.complete("Stale recommendation");
+    recommendationService.lastFuture.complete("Slow recommendation response");
+
+    assertTrue(recommendationService.lastFuture.isCancelled());
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.inSession());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testRecommendationRequestTwice() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture.complete("Recommendation response 1");
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture.complete("Recommendation response 2");
+
+    assertEquals(2, recommendationService.callCount);
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.breakRecommendationRequested());
+    assertNotNull(state.dialogState());
+    assertEquals("Recommendation response 2", state.dialogState().message());
+  }
+
+  @Test
+  void testNotInSessionBlocksRecommendation() {
+    // Initially not in session
+    interactor.requestBreakRecommendationNow();
+
+    assertEquals(0, recommendationService.callCount);
+  }
+
+  @Test
+  void testRecommendationDebouncing() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    interactor.requestBreakRecommendationNow();
+
+    assertEquals(1, recommendationService.callCount);
+  }
+
+  @Test
+  void testAcceptBreakRecommendation() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture.complete("Recommendation response");
+    UUID dialogId = stateChangeCaptor.lastState.dialogState().id();
+    interactor.acceptBreakRecommendation(dialogId);
 
     State state = stateChangeCaptor.lastState;
     assertFalse(state.inSession());
+    assertEquals(1, state.sessions());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testAcceptBreakRecommendationIdempotent() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture.complete("Recommendation response");
+    UUID dialogId = stateChangeCaptor.lastState.dialogState().id();
+    interactor.acceptBreakRecommendation(dialogId);
+    interactor.acceptBreakRecommendation(dialogId);
+
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.inSession());
+    assertEquals(1, state.sessions());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testRejectBreakRecommendation() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture.complete("Recommendation response");
+    UUID dialogId = stateChangeCaptor.lastState.dialogState().id();
+    interactor.rejectBreakRecommendation(dialogId);
+
+    State state = stateChangeCaptor.lastState;
+    assertTrue(state.inSession());
+    assertEquals(0, state.sessions());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testRejectBreakRecommendationIdempotent() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture.complete("Recommendation response");
+    UUID dialogId = stateChangeCaptor.lastState.dialogState().id();
+    interactor.rejectBreakRecommendation(dialogId);
+    interactor.rejectBreakRecommendation(dialogId);
+
+    State state = stateChangeCaptor.lastState;
+    assertTrue(state.inSession());
+    assertEquals(0, state.sessions());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testManualSwitchClearsDialog() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture.complete("Recommendation response");
+
+    assertNotNull(stateChangeCaptor.lastState.breakRecommendationRequested());
+
+    interactor.switchWorkBreak();
+
+    State state = stateChangeCaptor.lastState;
     assertFalse(state.breakRecommendationRequested());
     assertNull(state.dialogState());
   }
@@ -201,26 +340,6 @@ class InteractorTest {
     @Override
     public void accept(State state) {
       lastState = state;
-    }
-  }
-
-  private static class FakeRecommendationService implements RecommendationService {
-    private int callCount;
-    private RecommendationRequest lastRequest;
-    private CompletableFuture<String> future = new CompletableFuture<>();
-
-    @Override
-    public CompletableFuture<String> getRecommendation(RecommendationRequest request) {
-      callCount++;
-      lastRequest = request;
-      return future;
-    }
-  }
-
-  private static class NonCancellableFuture extends CompletableFuture<String> {
-    @Override
-    public boolean cancel(boolean mayInterruptIfRunning) {
-      return false;
     }
   }
 
@@ -283,6 +402,17 @@ class InteractorTest {
         throw new IOException("Simulated write error");
       this.lastDataWritten = data;
     }
+  }
+  private static class FakeRecommendationService implements RecommendationService {
+    private int callCount;
+    private RecommendationRequest lastRequest;
+    private CompletableFuture<String> lastFuture;
 
+    @Override
+    public CompletableFuture<String> getRecommendation(RecommendationRequest request) {
+      callCount++;
+      lastRequest = request;
+      return lastFuture = new CompletableFuture<>();
+    }
   }
 }

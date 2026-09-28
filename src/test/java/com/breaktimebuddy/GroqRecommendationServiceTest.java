@@ -36,7 +36,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Stand up and stretch for five minutes.", result);
   }
@@ -50,7 +50,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Take a 5-minute break and stretch.", result);
   }
@@ -77,7 +77,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(4, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(4, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Take a 10-minute break. Walk around, stretch, and drink some water.", result);
   }
@@ -92,7 +92,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(1, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(1, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Take a short break and rest your eyes.", result);
   }
@@ -127,7 +127,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(2, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(2, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Take a short walk and stretch.", result);
 
@@ -163,7 +163,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(2, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(2, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Rest your eyes and take a brief stretch.", result);
 
@@ -199,7 +199,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Stand up, breathe, and stretch for a few minutes.", result);
 
@@ -221,11 +221,57 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Take a 5-minute break and stretch.", result);
 
     assertEquals(1, calls.get());
+  }
+
+  @Test
+  void usesFallbackWhenRecommendationContainsMedicalAdvice() {
+    GroqHttpClient client = request -> CompletableFuture.completedFuture(response(200, """
+        {
+          "choices": [
+            {
+              "message": {
+                "content": "Take ibuprofen for your headache and rest for five minutes."
+              }
+            }
+          ]
+        }
+        """));
+
+    GroqRecommendationService service =
+        new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
+
+    String result = service
+        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(25), Duration.ofMinutes(10), List.of())).join();
+
+    assertEquals("Take a 5-minute break and stretch.", result);
+  }
+
+  @Test
+  void usesFallbackWhenRecommendationContainsTreatmentAdvice() {
+    GroqHttpClient client = request -> CompletableFuture.completedFuture(response(200, """
+        {
+          "choices": [
+            {
+              "message": {
+                "content": "Start taking a pain reliever as treatment for your headache."
+              }
+            }
+          ]
+        }
+        """));
+
+    GroqRecommendationService service =
+        new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
+
+    String result = service
+        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(25), Duration.ofMinutes(10), List.of())).join();
+
+    assertEquals("Take a 5-minute break and stretch.", result);
   }
 
   private static HttpResponse<String> response(int statusCode, String body) {

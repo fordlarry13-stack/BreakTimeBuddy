@@ -1,12 +1,18 @@
 package com.breaktimebuddy;
 
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.ObjectProperty;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.TextFormatter;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Builder;
+import javafx.util.converter.IntegerStringConverter;
 
 /**
  * Builds the JavaFX view hierarchy.
@@ -22,6 +28,9 @@ public class ViewBuilder implements Builder<Region> {
   private final Runnable requestBreakRecommendationNow;
   private final Runnable acceptBreakRecommendation;
   private final Runnable rejectBreakRecommendation;
+
+  // Reference needed to prevent GC
+  private final ObjectProperty<Integer> preferredWorkLengthInMinutesPropertyAsObject;
 
   /**
    * Creates a view builder with the given view model and action handlers.
@@ -44,6 +53,9 @@ public class ViewBuilder implements Builder<Region> {
     this.requestBreakRecommendationNow = requestBreakRecommendationNow;
     this.acceptBreakRecommendation = acceptBreakRecommendation;
     this.rejectBreakRecommendation = rejectBreakRecommendation;
+
+    preferredWorkLengthInMinutesPropertyAsObject =
+        viewModel.preferredWorkLengthInMinutesProperty().asObject();
   }
 
   @Override
@@ -55,6 +67,38 @@ public class ViewBuilder implements Builder<Region> {
     sessionToggleButton.textProperty().bind(viewModel.sessionStatusTextProperty());
     Label sessionsLabel = new Label();
     sessionsLabel.textProperty().bind(viewModel.sessionsProperty().asString("Sessions: %d"));
+    Label preferredWorkLengthLabel, preferredWorkLengthLabelAfter = new Label(" minutes");
+    Spinner<Integer> preferredWorkLengthSpinner;
+    {
+      int min = viewModel.getMinPreferredWorkLengthInMinutes(),
+          max = viewModel.getMaxPreferredWorkLengthInMinutes(),
+          default_ = viewModel.getDefaultPreferredWorkLengthInMinutes();
+      preferredWorkLengthLabel = new Label("Preferred work length (%d-%d) : ".formatted(min, max));
+      preferredWorkLengthSpinner = new Spinner<>(min, max, 0, 10);
+      preferredWorkLengthSpinner.setPrefWidth(60);
+      preferredWorkLengthSpinner.setEditable(true);
+      Pattern filterPattern = Pattern.compile("\\d{0,%d}".formatted(String.valueOf(max).length()));
+      TextFormatter<Integer> textFormatter = new TextFormatter<>(new IntegerStringConverter() {
+        @Override
+        public Integer fromString(String s) {
+          try {
+            return Math.min(
+                Math.max(s == null || s.trim().isEmpty() ? default_ : Integer.parseInt(s), min),
+                max);
+          } catch (NumberFormatException e) {
+            return preferredWorkLengthSpinner.valueProperty().getValue();
+          }
+        }
+      }, preferredWorkLengthSpinner.valueProperty().getValue(),
+          change -> filterPattern.matcher(change.getControlNewText()).matches() ? change : null);
+      preferredWorkLengthSpinner.getEditor().setTextFormatter(textFormatter);
+      preferredWorkLengthSpinner.getValueFactory().valueProperty()
+          .bindBidirectional(textFormatter.valueProperty());
+      preferredWorkLengthSpinner.getValueFactory().valueProperty()
+          .bindBidirectional(preferredWorkLengthInMinutesPropertyAsObject);
+    }
+    HBox preferredWorkLengthContainer = new HBox(preferredWorkLengthLabel,
+        preferredWorkLengthSpinner, preferredWorkLengthLabelAfter);
     Label historyLabel = new Label();
     historyLabel.textProperty()
         .bind(Bindings.createStringBinding(
@@ -83,9 +127,10 @@ public class ViewBuilder implements Builder<Region> {
     saveConfigButton.setOnAction(e -> saveConfig.run());
     Button loadConfigButton = new Button("Load config");
     loadConfigButton.setOnAction(e -> loadConfig.run());
-    root.getChildren().addAll(title, sessionToggleButton, sessionsLabel, historyLabel,
-        breakRecommendationRequestedLabel, requestBreakRecommendationNowButton, dialogDisplay,
-        saveConfigButton, loadConfigButton, configFeedbackLabel);
+    root.getChildren().addAll(title, sessionToggleButton, sessionsLabel,
+        preferredWorkLengthContainer, historyLabel, breakRecommendationRequestedLabel,
+        requestBreakRecommendationNowButton, dialogDisplay, saveConfigButton, loadConfigButton,
+        configFeedbackLabel);
     return root;
   }
 }
