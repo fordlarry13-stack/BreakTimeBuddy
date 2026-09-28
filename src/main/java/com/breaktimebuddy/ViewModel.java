@@ -26,6 +26,9 @@ import javafx.collections.FXCollections;
  * Exposes observable properties bound to the view. Updated by the {@link Controller} in response to
  * {@link Interactor} state changes.
  *
+ * The {@code preferredWorkLength} and {@code preferredWorkLengthInMinutes} properties are
+ * synchronized.
+ *
  * The {@code configFeedbackTimestamp} and {@code configFeedbackMessage} properties display
  * transient feedback after save/load operations (success or error messages).
  */
@@ -171,70 +174,158 @@ public class ViewModel {
     this.sessions.set(sessions);
   }
 
+  /**
+   * Returns the preferred work length.
+   *
+   * @return the preferred work length
+   */
   public Duration getPreferredWorkLength() {
     return preferredWorkLength.get();
   }
 
+  /**
+   * Returns the property for the preferred work length.
+   *
+   * @return the preferred work length property
+   */
   public ObjectProperty<Duration> preferredWorkLengthProperty() {
     return preferredWorkLength;
   }
 
+  /**
+   * Sets the preferred work length.
+   *
+   * @param preferredWorkLength the preferred work length
+   */
   public void setPreferredWorkLength(Duration preferredWorkLength) {
     this.preferredWorkLength.set(preferredWorkLength);
   }
 
+  /**
+   * Returns the preferred work length in minutes.
+   *
+   * @return the preferred work length in minutes
+   */
   public int getPreferredWorkLengthInMinutes() {
     return preferredWorkLengthInMinutes.get();
   }
 
+  /**
+   * Returns the property for the preferred work length in minutes.
+   *
+   * @return the preferred work length in minutes property
+   */
   public IntegerProperty preferredWorkLengthInMinutesProperty() {
     return preferredWorkLengthInMinutes;
   }
 
+  /**
+   * Sets the preferred work length in minutes.
+   *
+   * @param preferredWorkLengthInMinutes the preferred work length in minutes
+   */
   public void setPreferredWorkLengthInMinutes(int preferredWorkLengthInMinutes) {
     this.preferredWorkLengthInMinutes.set(preferredWorkLengthInMinutes);
   }
 
+  /**
+   * Returns the default preferred work length. It is set during initialization.
+   *
+   * @return the default preferred work length
+   */
   public Duration getDefaultPreferredWorkLength() {
     return defaultPreferredWorkLength.get();
   }
 
+  /**
+   * Returns the property for the default preferred work length. It is set during initialization.
+   *
+   * @return the default preferred work length property
+   */
   public ObjectProperty<Duration> defaultPreferredWorkLengthProperty() {
     return defaultPreferredWorkLength;
   }
 
+  /**
+   * Sets the default preferred work length. It is set during initialization. Using this method does
+   * NOT set the actual default.
+   *
+   * @param defaultPreferredWorkLength the default preferred work length
+   */
   public void setDefaultPreferredWorkLength(Duration defaultPreferredWorkLength) {
     this.defaultPreferredWorkLength.set(defaultPreferredWorkLength);
   }
 
+  /**
+   * Returns the default preferred work length in minutes. It is set during initialization.
+   *
+   * @return the default preferred work length in minutes
+   */
   public int getDefaultPreferredWorkLengthInMinutes() {
     return defaultPreferredWorkLengthInMinutes.get();
   }
 
+  /**
+   * Returns the property for the default preferred work length in minutes. It is set during
+   * initialization.
+   *
+   * @return the default preferred work length in minutes property
+   */
   public IntegerProperty defaultPreferredWorkLengthInMinutesProperty() {
     return defaultPreferredWorkLengthInMinutes;
   }
 
+  /**
+   * Sets the default preferred work length in minutes. It is set during initialization. Using this
+   * method does NOT set the actual default.
+   *
+   * @param defaultPreferredWorkLengthInMinutes the default preferred work length in minutes
+   */
   public void setDefaultPreferredWorkLengthInMinutes(int defaultPreferredWorkLengthInMinutes) {
     this.defaultPreferredWorkLengthInMinutes.set(defaultPreferredWorkLengthInMinutes);
   }
 
+  /**
+   * Returns the minimum work length.
+   *
+   * @return the minimum work length
+   */
   public int getMinPreferredWorkLengthInMinutes() {
     return minPreferredWorkLengthInMinutes.get();
   }
 
+  /**
+   * Returns the property for the minimum work length.
+   *
+   * @return the minimum work length property
+   */
   public ReadOnlyIntegerProperty minPreferredWorkLengthInMinutesProperty() {
     return minPreferredWorkLengthInMinutes.getReadOnlyProperty();
   }
 
+  /**
+   * Returns the maximum work length.
+   *
+   * @return the maximum work length
+   */
   public int getMaxPreferredWorkLengthInMinutes() {
     return maxPreferredWorkLengthInMinutes.get();
   }
 
+  /**
+   * Returns the property for the maximum work length.
+   *
+   * @return the maximum work length property
+   */
   public ReadOnlyIntegerProperty maxPreferredWorkLengthInMinutesProperty() {
     return maxPreferredWorkLengthInMinutes.getReadOnlyProperty();
   }
 
+  /**
+   * Returns the history of work and break sessions.
+   *
+   * @return the history
+   */
   public List<HistoryItem> getHistory() {
     return history;
   }

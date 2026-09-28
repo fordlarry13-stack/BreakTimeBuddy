@@ -64,6 +64,13 @@ public class Interactor {
     }
   }
 
+  /**
+   * Sets the preferred work length. Replaces {@code null} with the default value, clamps it between
+   * the minimum and the maximum, truncates it to a multiple of the unit, and notifies the state
+   * change listener.
+   *
+   * @param preferredWorkLength the preferred work length
+   */
   public void setPreferredWorkLength(Duration preferredWorkLength) {
     this.preferredWorkLength =
         preferredWorkLength == null ? ConfigData.getDefault().preferredWorkLength()
@@ -153,10 +160,9 @@ public class Interactor {
       return;
     if (!breakRecommendationRequested.compareAndSet(false, true))
       return;
-    CompletableFuture<String> future =
-        recommendationService.getRecommendation(new RecommendationRequest(sessions,
-            preferredWorkLength, Duration.between(nextHistoryItem.beginTime(), Instant.now()),
-            List.copyOf(history)));
+    CompletableFuture<String> future = recommendationService
+        .getRecommendation(new RecommendationRequest(sessions, preferredWorkLength,
+            Duration.between(nextHistoryItem.beginTime(), Instant.now()), List.copyOf(history)));
     currentBreakRecommendationFuture = future;
     future.whenComplete((message, error) -> {
       if (future != currentBreakRecommendationFuture)
@@ -180,7 +186,7 @@ public class Interactor {
    * Accepts a break recommendation, ending the current work session and starting a break.
    *
    * @param messageId the ID of the recommendation; if it doesn't match the current recommendation,
-   *     the call is silently ignored
+   *        the call is silently ignored
    */
   public void acceptBreakRecommendation(UUID messageId) {
     breakRecommendationState.updateAndGet(state -> {
@@ -197,7 +203,7 @@ public class Interactor {
    * Rejects a break recommendation, dismissing it without starting a break.
    *
    * @param messageId the ID of the recommendation; if it doesn't match the current recommendation,
-   *     the call is silently ignored
+   *        the call is silently ignored
    */
   public void rejectBreakRecommendation(UUID messageId) {
     breakRecommendationState.updateAndGet(state -> {

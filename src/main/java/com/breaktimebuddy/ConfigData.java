@@ -147,9 +147,14 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) Duration preferre
   }
 
   /**
-   * Returns a default {@code ConfigData} instance.
+   * Returns a default {@code ConfigData} instance. It has the following parameters:
    *
-   * @return a ConfigData with zero sessions and empty history
+   * <ul>
+   * <li>{@code sessions = 0}
+   * <li>Empty {@code history}
+   * <li>Default {@code preferredWorkLength} defined with
+   * {@link PreferencesHelper#DEFAULT_PREFERRED_WORK_LENGTH}
+   * </ul>
    */
   public static ConfigData getDefault() {
     return sanitize(null, false);
