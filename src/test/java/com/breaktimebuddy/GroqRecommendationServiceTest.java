@@ -246,7 +246,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(25), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Take a 5-minute break and stretch.", result);
   }
@@ -269,7 +269,7 @@ class GroqRecommendationServiceTest {
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
     String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), List.of())).join();
+        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(25), Duration.ofMinutes(10), List.of())).join();
 
     assertEquals("Take a 5-minute break and stretch.", result);
   }
