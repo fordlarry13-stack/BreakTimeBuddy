@@ -62,4 +62,3 @@ Later:
 - session count save/load works
 - recommendation returns a short string
 - CI stays green
-

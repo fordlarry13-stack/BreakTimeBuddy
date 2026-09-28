@@ -8,7 +8,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -61,6 +64,8 @@ class InteractorTest {
     State state = stateChangeCaptor.lastState;
     assertFalse(state.inSession());
     assertEquals(0, state.sessions());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), state.preferredWorkLength());
     assertEquals(List.of(), state.history());
   }
 
@@ -108,6 +113,28 @@ class InteractorTest {
   }
 
   @Test
+  void testSetPreferredWorkLength() {
+    Duration min = Duration.of(PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    Duration max = Duration.of(PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    List<Duration> inputs = Arrays.asList(Duration.of(20, ChronoUnit.MINUTES), null,
+        min.dividedBy(2), max.multipliedBy(2), min);
+    List<Duration> expected = Arrays.asList(Duration.of(20, ChronoUnit.MINUTES),
+        Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+            PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH),
+        min, max, min);
+    List<Duration> outputs = inputs.stream().map(e -> {
+      interactor.setPreferredWorkLength(e);
+      return stateChangeCaptor.lastState.preferredWorkLength();
+    }).toList();
+    for (int i = 0; i < outputs.size(); i++) {
+      assertNotNull(outputs.get(i), String.valueOf(i));
+    }
+    assertIterableEquals(expected, outputs);
+  }
+
+  @Test
   void testSaveConfigCallsConfigHandlerWrite() throws IOException {
     // Set up state: end 3 sessions
     for (int i = 0; i < 6; i++)
@@ -116,6 +143,8 @@ class InteractorTest {
     ConfigData data = configHandler.getLastDataWritten();
     assertNotNull(data);
     assertEquals(3, data.sessions());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), data.preferredWorkLength());
     assertEquals(5, data.history().size());
     for (int i = 0; i < 5; i++)
       assertEquals(
@@ -125,10 +154,11 @@ class InteractorTest {
 
   @Test
   void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonParseException {
-    configHandler.setDataToReturn(new ConfigData(7, testHistoryData));
+    configHandler.setDataToReturn(new ConfigData(7, Duration.of(10, ChronoUnit.MINUTES), testHistoryData));
     interactor.loadConfig();
     State state = stateChangeCaptor.lastState;
     assertEquals(7, state.sessions());
+    assertEquals(Duration.of(10, ChronoUnit.MINUTES), state.preferredWorkLength());
     assertIterableEquals(testHistory, state.history());
   }
 

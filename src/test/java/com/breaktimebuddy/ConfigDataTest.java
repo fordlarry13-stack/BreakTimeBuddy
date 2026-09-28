@@ -1,7 +1,9 @@
 package com.breaktimebuddy;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -16,7 +18,7 @@ class ConfigDataTest {
 
   @Test
   void testSanitizeDataValid() {
-    ConfigData originalData = new ConfigData(1,
+    ConfigData originalData = new ConfigData(1, ConfigData.getDefault().preferredWorkLength(),
         List.of(
             new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
                 Instant.ofEpochSecond(1, 2), Instant.ofEpochSecond(3, 4)),
@@ -34,13 +36,47 @@ class ConfigDataTest {
 
   @Test
   void testSanitizeDataNegativeSessions() {
-    ConfigData data = ConfigData.sanitize(new ConfigData(-1, List.of()));
+    ConfigData data = ConfigData.sanitize(new ConfigData(-1, ConfigData.getDefault().preferredWorkLength(), List.of()));
     assertEquals(0, data.sessions());
+  }
+
+
+  @Test
+  void testSanitizeNullPreferredWorkLength() {
+    ConfigData data = ConfigData.sanitize(new ConfigData(1, null, List.of()));
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), data.preferredWorkLength());
+  }
+
+  @Test
+  void testSanitizeSmallPreferredWorkLength() {
+    Duration limit = Duration.of(PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    ConfigData data = ConfigData.sanitize(new ConfigData(1, limit.dividedBy(2), List.of()));
+    assertEquals(limit, data.preferredWorkLength());
+  }
+
+  @Test
+  void testSanitizeLargePreferredWorkLength() {
+    Duration limit = Duration.of(PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    ConfigData data = ConfigData.sanitize(new ConfigData(1, limit.multipliedBy(2), List.of()));
+    assertEquals(limit, data.preferredWorkLength());
+  }
+
+  @Test
+  void testSanitizeUnquantizedPreferredWorkLength() {
+    Duration duration = Duration
+        .of(PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
+            PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH)
+        .plus(PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH.getDuration().dividedBy(2));
+    ConfigData data = ConfigData.sanitize(new ConfigData(1, duration, List.of()));
+    assertNotEquals(duration, data.preferredWorkLength());
   }
 
   @Test
   void testSanitizeDataNullHistory() {
-    ConfigData data = ConfigData.sanitize(new ConfigData(1, null));
+    ConfigData data = ConfigData.sanitize(new ConfigData(1, ConfigData.getDefault().preferredWorkLength(), null));
     assertIterableEquals(List.of(), data.history());
   }
 
@@ -52,14 +88,14 @@ class ConfigDataTest {
       history.add(new ConfigData.HistoryItem(
           i % 2 == 0 ? ConfigData.HistoryItem.Phase.WORK : ConfigData.HistoryItem.Phase.BREAK,
           Instant.ofEpochSecond(i * 2), Instant.ofEpochSecond(i * 2 + 1)));
-    ConfigData data = ConfigData.sanitize(new ConfigData(1, history));
+    ConfigData data = ConfigData.sanitize(new ConfigData(1, ConfigData.getDefault().preferredWorkLength(), history));
     assertTrue(data.history().size() <= HISTORY_LENGTH);
   }
 
   @Test
   void testSanitizeDataFilterFailedTrySanitizeHistoryItem() {
     ConfigData data = ConfigData.sanitize(new ConfigData(1,
-        Arrays.asList(new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
+        ConfigData.getDefault().preferredWorkLength(), Arrays.asList(new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
             Instant.ofEpochSecond(1, 2), Instant.ofEpochSecond(3, 4)), null)));
     assertIterableEquals(Arrays.asList(new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
         Instant.ofEpochSecond(1, 2), Instant.ofEpochSecond(3, 4))), data.history());

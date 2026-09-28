@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +42,7 @@ class ConfigHandlerTest {
   void testReadReturnsConfigData() throws IOException, JsonParseException {
     // Arrange: storage provides valid JSON for ConfigData
     String json = """
-        {"sessions":5,"history":%s}""".formatted(testHistoryJson);
+        {"sessions":5,"preferredWorkLength":{"seconds":600,"nanos":0},"history":%s}""".formatted(testHistoryJson);
     storage.setInputData(json);
 
     // Act
@@ -50,6 +51,7 @@ class ConfigHandlerTest {
     // Assert
     assertNotNull(data);
     assertEquals(5, data.sessions());
+    assertEquals(Duration.ofSeconds(600), data.preferredWorkLength());
     assertIterableEquals(testHistory, data.history());
   }
 
@@ -86,7 +88,7 @@ class ConfigHandlerTest {
   @Test
   void testWriteWritesJson() throws IOException {
     // Arrange
-    ConfigData data = new ConfigData(10, testHistory);
+    ConfigData data = new ConfigData(10, Duration.ofMinutes(10), testHistory);
     ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
     storage.setOutputCaptor(outBytes);
 
@@ -98,6 +100,8 @@ class ConfigHandlerTest {
     // The written JSON should contain the data
     assertTrue(written.contains("""
         "sessions":10"""));
+    assertTrue(written.contains("""
+        "preferredWorkLength":{"seconds":600,"nanos":0}"""));
     assertTrue(written.contains("""
         "history":%s""".formatted(testHistoryJson)));
   }
@@ -115,7 +119,7 @@ class ConfigHandlerTest {
   void testWriteThrowsIOExceptionWhenStorageThrows() throws IOException {
     // Arrange: Simulate output failure
     storage.setThrowOnOut(true);
-    ConfigData data = new ConfigData(1, testHistory);
+    ConfigData data = new ConfigData(1, Duration.ofMinutes(10), testHistory);
 
     // Act & Assert
     assertThrows(IOException.class, () -> handler.write(data));
