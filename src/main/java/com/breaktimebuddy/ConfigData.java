@@ -68,6 +68,8 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) Duration preferre
      * replaced with the default values. If the whole data is not fixable, then returns
      * {@code null}.
      *
+     * This considers bad {@code beginTime} and {@code endTime} unfixable.
+     *
      * @param item the data to be sanitized
      * @return a copy of the data after sanitization, or null if the item cannot be fixed
      */
