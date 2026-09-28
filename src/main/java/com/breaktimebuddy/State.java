@@ -4,7 +4,8 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Public inner state snapshot.
+ * Public inner state snapshot. This class is immutable and therefore thread‑safe if {@code history}
+ * is too.
  *
  * @param inSession whether a work session is active
  * @param sessions the number of completed sessions

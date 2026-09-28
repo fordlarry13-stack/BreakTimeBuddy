@@ -8,7 +8,8 @@ import com.google.gson.annotations.Since;
 
 /**
  * Data transfer object that carries the data saved to the configuration file. This class is
- * immutable and therefore thread‑safe.
+ * immutable and therefore thread‑safe if {@code history} is too. The result of
+ * {@link #sanitize(ConfigData)} ensures this.
  *
  * The default values set in {@link #sanitize(ConfigData)} are also used as the initial values in
  * {@link Interactor}.
@@ -67,7 +68,7 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) Duration preferre
      * replaced with the default values. If the whole data is not fixable, then returns
      * {@code null}.
      *
-     * @param item the data to be sanitized; if null, the default data is returned
+     * @param item the data to be sanitized
      * @return a copy of the data after sanitization, or null if the item cannot be fixed
      */
     public static HistoryItem trySanitize(HistoryItem item) {
@@ -77,7 +78,8 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) Duration preferre
 
   /**
    * Validates and sanitizes the given data, correcting missing, invalid, or inconsistent values. If
-   * output is true, errors are logged to the console.
+   * output is true, errors are logged to the console. The result is guaranteed to be immutable and
+   * therefore thread‑safe.
    *
    * @param data the data to be sanitized; if null, the default data is returned
    * @param output if true, errors are logged to the console; if false, they are suppressed
@@ -121,7 +123,7 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) Duration preferre
 
         history = data.history.stream().limit(HistoryItem.HISTORY_LENGTH)
             .map(item -> HistoryItem.trySanitize(item, output)).filter(item -> item != null)
-            .toList();
+            .toList(); // An unmodifiable list
       }
     }
 
@@ -137,7 +139,7 @@ public record ConfigData(@Since(1.0) int sessions, @Since(1.0) Duration preferre
    * Validates and sanitizes the given data, correcting missing, invalid, or inconsistent data, and
    * logs any errors to the console. Missing fields are filled with the default values. Invalid or
    * inconsistent data is fixed whenever possible; unfixable errors are removed and replaced with
-   * the default values.
+   * the default values. The result is guaranteed to be immutable and therefore thread‑safe.
    *
    * @param data the data to be sanitized; if null, the default data is returned
    * @return a copy of the data after sanitization

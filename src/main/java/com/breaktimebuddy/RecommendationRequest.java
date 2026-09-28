@@ -4,7 +4,8 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Request object containing context for a break recommendation.
+ * Request object containing context for a break recommendation. This class is immutable and
+ * therefore thread‑safe if {@code history} is too.
  *
  * @param sessions the number of completed sessions
  * @param preferredWorkLength the preferred work length
