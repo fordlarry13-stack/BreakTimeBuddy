@@ -3,7 +3,6 @@ package com.breaktimebuddy;
 import static org.junit.jupiter.api.Assertions.*;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,7 +35,8 @@ class ConfigDataTest {
 
   @Test
   void testSanitizeDataNegativeSessions() {
-    ConfigData data = ConfigData.sanitize(new ConfigData(-1, ConfigData.getDefault().preferredWorkLength(), List.of()));
+    ConfigData data = ConfigData
+        .sanitize(new ConfigData(-1, ConfigData.getDefault().preferredWorkLength(), List.of()));
     assertEquals(0, data.sessions());
   }
 
@@ -76,7 +76,8 @@ class ConfigDataTest {
 
   @Test
   void testSanitizeDataNullHistory() {
-    ConfigData data = ConfigData.sanitize(new ConfigData(1, ConfigData.getDefault().preferredWorkLength(), null));
+    ConfigData data =
+        ConfigData.sanitize(new ConfigData(1, ConfigData.getDefault().preferredWorkLength(), null));
     assertIterableEquals(List.of(), data.history());
   }
 
@@ -88,15 +89,17 @@ class ConfigDataTest {
       history.add(new ConfigData.HistoryItem(
           i % 2 == 0 ? ConfigData.HistoryItem.Phase.WORK : ConfigData.HistoryItem.Phase.BREAK,
           Instant.ofEpochSecond(i * 2), Instant.ofEpochSecond(i * 2 + 1)));
-    ConfigData data = ConfigData.sanitize(new ConfigData(1, ConfigData.getDefault().preferredWorkLength(), history));
+    ConfigData data = ConfigData
+        .sanitize(new ConfigData(1, ConfigData.getDefault().preferredWorkLength(), history));
     assertTrue(data.history().size() <= HISTORY_LENGTH);
   }
 
   @Test
   void testSanitizeDataFilterFailedTrySanitizeHistoryItem() {
-    ConfigData data = ConfigData.sanitize(new ConfigData(1,
-        ConfigData.getDefault().preferredWorkLength(), Arrays.asList(new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
-            Instant.ofEpochSecond(1, 2), Instant.ofEpochSecond(3, 4)), null)));
+    ConfigData data =
+        ConfigData.sanitize(new ConfigData(1, ConfigData.getDefault().preferredWorkLength(),
+            Arrays.asList(new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
+                Instant.ofEpochSecond(1, 2), Instant.ofEpochSecond(3, 4)), null)));
     assertIterableEquals(Arrays.asList(new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK,
         Instant.ofEpochSecond(1, 2), Instant.ofEpochSecond(3, 4))), data.history());
   }

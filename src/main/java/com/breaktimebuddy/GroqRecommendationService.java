@@ -1,5 +1,6 @@
 package com.breaktimebuddy;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -7,6 +8,7 @@ import com.google.gson.JsonParser;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +40,8 @@ public class GroqRecommendationService implements RecommendationService {
   }
 
   @Override
-  public CompletableFuture<String> getRecommendation(RecommendationRequest request) {
+  public CompletableFuture<RecommendationResponse> getRecommendation(
+      RecommendationRequest request) {
     if (apiKey == null || apiKey.isBlank()) {
       return fallbackService.getRecommendation(request);
     }
@@ -54,18 +57,20 @@ public class GroqRecommendationService implements RecommendationService {
     return sendWithRetry(request, httpRequest, 1);
   }
 
-  private CompletableFuture<String> sendWithRetry(RecommendationRequest request,
+  private CompletableFuture<RecommendationResponse> sendWithRetry(RecommendationRequest request,
       HttpRequest httpRequest, int attempt) {
     return httpClient.send(httpRequest).thenCompose(response -> {
-
       if (response.statusCode() == 200) {
-        String recommendation = extractRecommendation(response.body());
+        ResponseJsonObject recommendation = extractRecommendation(response.body());
+        RecommendationResponse recommendationResponse =
+            ResponseJsonObject.tryToRecommendationResponse(recommendation);
 
-        if (!isValidRecommendation(recommendation)) {
+        if (recommendationResponse == null)
           return fallbackService.getRecommendation(request);
-        }
-
-        return CompletableFuture.completedFuture(recommendation);
+        if (recommendationResponse.shouldBreak()
+            && !isValidRecommendation(recommendationResponse.activity()))
+          return fallbackService.getRecommendation(request);
+        return CompletableFuture.completedFuture(recommendationResponse);
       }
 
       if (isRetryableStatus(response.statusCode()) && attempt < MAX_ATTEMPTS) {
@@ -83,7 +88,7 @@ public class GroqRecommendationService implements RecommendationService {
     });
   }
 
-  private CompletableFuture<String> retryLater(RecommendationRequest request,
+  private CompletableFuture<RecommendationResponse> retryLater(RecommendationRequest request,
       HttpRequest httpRequest, int nextAttempt) {
     return CompletableFuture.runAsync(() -> {
     }, CompletableFuture.delayedExecutor(RETRY_DELAY_SECONDS, TimeUnit.SECONDS))
@@ -100,6 +105,18 @@ public class GroqRecommendationService implements RecommendationService {
   }
 
   private String buildPrompt(RecommendationRequest request) {
+    String workHistorySection = request.history().size() == 0
+        ? "The user has not completed any sessions."
+        : """
+            The following are the user's recent complete work and break sessions, \
+            in order from recent to oldest:
+            %s
+            """.formatted(
+            request.history().stream().map(item -> "- %s for %s".formatted(switch (item.phase()) {
+              case WORK -> "Work";
+              case BREAK -> "Break";
+            }, formatDuration(Duration.between(item.beginTime(), item.endTime()))))
+                .collect(Collectors.joining("\n")));
     return """
         You are Break Time Buddy.
 
@@ -109,26 +126,30 @@ public class GroqRecommendationService implements RecommendationService {
 
         The user has been working continuously for %s.
 
-        The following are the user's recent complete work and break sessions, \
-        in order from recent to oldest:
         %s
 
-        Recommend one short, healthy break activity.
+        Decide whether the user should take a break now.
+
+        Only if the user should take a break, recommend one short, healthy break activity.
         Keep the response under 30 words.
         Do not include medical advice.
         Return only the recommendation.
         """.formatted(request.sessions(), formatDuration(request.preferredWorkLength()),
-        formatDuration(request.workingDuration()),
-        request.history().stream().map(item -> "- %s for %s".formatted(switch (item.phase()) {
-          case WORK -> "Work";
-          case BREAK -> "Break";
-        }, formatDuration(Duration.between(item.beginTime(), item.endTime()))))
-            .collect(Collectors.joining("\n")));
+        formatDuration(request.workingDuration()), workHistorySection);
+  }
+
+  private record ResponseJsonObject(boolean shouldBreak, String activity) {
+    static RecommendationResponse tryToRecommendationResponse(ResponseJsonObject o) {
+      if (o.shouldBreak() && o.activity() == null)
+        return null;
+      return new RecommendationResponse(o.shouldBreak(),
+          o.shouldBreak() ? o.activity().trim() : "");
+    }
   }
 
   private String buildRequestBody(String prompt) {
     String escapedPrompt = escapeJson(prompt);
-
+    // Strict Mode is not available with the model used
     return """
         {
           "model": "%s",
@@ -138,12 +159,34 @@ public class GroqRecommendationService implements RecommendationService {
               "role": "user",
               "content": "%s"
             }
-          ]
+          ],
+          "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+              "name": "breakRecommendation",
+              "strict": false,
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "shouldBreak": {
+                    "type": "boolean",
+                    "description": "Whether the user should take a break"
+                  },
+                  "activity": {
+                    "type": "string",
+                    "description": "A recommended break activity"
+                  }
+                },
+                "required": ["shouldBreak"],
+                "additionalProperties": false
+              }
+            }
+          }
         }
         """.formatted(MODEL, escapedPrompt);
   }
 
-  private String extractRecommendation(String responseBody) {
+  private ResponseJsonObject extractRecommendation(String responseBody) {
     try {
       JsonObject root = JsonParser.parseString(responseBody).getAsJsonObject();
 
@@ -159,8 +202,9 @@ public class GroqRecommendationService implements RecommendationService {
         return null;
       }
 
-      return message.get("content").getAsString().trim();
-
+      String contentString = message.get("content").getAsString().trim();
+      // JsonSyntaxException is RuntimeException
+      return new Gson().fromJson(contentString, ResponseJsonObject.class);
     } catch (RuntimeException error) {
       return null;
     }
@@ -188,22 +232,10 @@ public class GroqRecommendationService implements RecommendationService {
   }
 
   private boolean containsMedicalAdvice(String lowerCase) {
-    return lowerCase.contains("ibuprofen")
-        || lowerCase.contains("aspirin")
-        || lowerCase.contains("acetaminophen")
-        || lowerCase.contains("medication")
-        || lowerCase.contains("medicine")
-        || lowerCase.contains("dosage")
-        || lowerCase.contains("dose")
-        || lowerCase.contains("diagnose")
-        || lowerCase.contains("diagnosis")
-        || lowerCase.contains("treatment")
-        || lowerCase.contains("prescription")
-        || lowerCase.contains("prescribe")
-        || lowerCase.contains("take a pain reliever")
-        || lowerCase.contains("take pain reliever")
-        || lowerCase.contains("stop taking")
-        || lowerCase.contains("start taking");
+    List<String> forbiddenList = List.of("ibuprofen", "aspirin", "acetaminophen", "medication",
+        "medicine", "dosage", "dose", "diagnose", "diagnosis", "treatment", "prescription",
+        "prescribe", "take a pain reliever", "take pain reliever", "stop taking", "start taking");
+    return forbiddenList.stream().anyMatch(e -> lowerCase.contains(e));
   }
 
   private String escapeJson(String value) {
