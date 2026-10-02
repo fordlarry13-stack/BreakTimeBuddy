@@ -110,7 +110,7 @@ When `GROQ_API_KEY` is configured, Break Time Buddy may send a recommendation re
 
 AI-generated output can be inaccurate or unsuitable. Recommendations are general break and wellness suggestions, not medical advice.
 
-If Groq is not configured or available, or if a valid AI response cannot be obtained, the application can use its rule-based fallback. Do not assume that using an environment variable provides complete privacy or production-grade secret protection.
+If Groq is not configured or available, or if a valid AI response cannot be obtained, the application can use its rule-based fallback. Using an environment variable reduces the risk of accidentally committing the Groq credential to source control, but it should not be considered production-grade secret protection for a distributed desktop application.
 
 ## 11. Troubleshooting
 
