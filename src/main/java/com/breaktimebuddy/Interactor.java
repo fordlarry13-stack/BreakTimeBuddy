@@ -37,7 +37,7 @@ public class Interactor {
   private LinkedList<HistoryItem> history = new LinkedList<>();
   private HistoryItem.Open nextHistoryItem;
   private AtomicBoolean breakRecommendationRequested = new AtomicBoolean();
-  private CompletableFuture<String> currentBreakRecommendationFuture;
+  private CompletableFuture<RecommendationResponse> currentBreakRecommendationFuture;
   private AtomicReference<BreakRecommendationState> breakRecommendationState =
       new AtomicReference<>();
 
@@ -147,7 +147,8 @@ public class Interactor {
     notifyStateChange();
   }
 
-  private void clearAndCancelBreakRecommendationRequest(CompletableFuture<String> future) {
+  private void clearAndCancelBreakRecommendationRequest(
+      CompletableFuture<RecommendationResponse> future) {
     if (future != null && future == currentBreakRecommendationFuture) {
       breakRecommendationRequested.set(false);
       currentBreakRecommendationFuture = null;
@@ -160,15 +161,16 @@ public class Interactor {
       return;
     if (!breakRecommendationRequested.compareAndSet(false, true))
       return;
-    CompletableFuture<String> future = recommendationService
+    CompletableFuture<RecommendationResponse> future = recommendationService
         .getRecommendation(new RecommendationRequest(sessions, preferredWorkLength,
             Duration.between(nextHistoryItem.beginTime(), Instant.now()), List.copyOf(history)));
     currentBreakRecommendationFuture = future;
-    future.whenComplete((message, error) -> {
+    future.whenComplete((response, error) -> {
       if (future != currentBreakRecommendationFuture)
         return;
-      if (error == null && inSession)
-        breakRecommendationState.set(new BreakRecommendationState(UUID.randomUUID(), message));
+      if (error == null && inSession && response.shouldBreak())
+        breakRecommendationState
+            .set(new BreakRecommendationState(UUID.randomUUID(), response.activity()));
       clearAndCancelBreakRecommendationRequest(future);
       notifyStateChange();
     });
