@@ -4,17 +4,34 @@ import java.time.LocalTime;
 import javafx.application.Platform;
 import javafx.scene.layout.Region;
 
-// TODO: Rename
+/**
+ * Mediates between the view ({@link ViewBuilder}) and business logic ({@link Interactor}).
+ *
+ * Handles UI events, updates the {@link ViewModel}, and delegates to the interactor for state
+ * changes and persistence.
+ */
 public class Controller {
   private final ViewModel viewModel;
   private final Interactor interactor;
   private final ViewBuilder viewBuilder;
 
+  /**
+   * Creates a controller with the given configuration handler and the default
+   * {@link GroqRecommendationService}.
+   *
+   * @param configHandler the handler for reading and writing configuration
+   */
   public Controller(ConfigHandler configHandler) {
     this(configHandler, new GroqRecommendationService());
   }
 
-  Controller(ConfigHandler configHandler, RecommendationService recommendationService) {
+  /**
+   * Creates a controller with the given dependencies.
+   *
+   * @param configHandler the handler for reading and writing configuration
+   * @param recommendationService the service for generating break recommendations
+   */
+  private Controller(ConfigHandler configHandler, RecommendationService recommendationService) {
     viewModel = new ViewModel();
     interactor = new Interactor(state -> {
       if (Platform.isFxApplicationThread())
@@ -82,6 +99,11 @@ public class Controller {
     viewModel.setDialogState(state.dialogState());
   }
 
+  /**
+   * Returns the root view node built by the {@link ViewBuilder}.
+   *
+   * @return the view to display in the scene
+   */
   public Region getView() {
     return viewBuilder.build();
   }

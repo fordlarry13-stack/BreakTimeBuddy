@@ -14,7 +14,12 @@ import javafx.scene.layout.VBox;
 import javafx.util.Builder;
 import javafx.util.converter.IntegerStringConverter;
 
-// TODO: Rename
+/**
+ * Builds the JavaFX view hierarchy.
+ *
+ * Binds UI controls to {@link ViewModel} properties and wires action handlers to controller
+ * callbacks.
+ */
 public class ViewBuilder implements Builder<Region> {
   private final ViewModel viewModel;
   private final Runnable switchWorkBreak;
@@ -27,6 +32,17 @@ public class ViewBuilder implements Builder<Region> {
   // Reference needed to prevent GC
   private final ObjectProperty<Integer> preferredWorkLengthInMinutesPropertyAsObject;
 
+  /**
+   * Creates a view builder with the given view model and action handlers.
+   *
+   * @param viewModel the view model to bind to
+   * @param switchWorkBreak callback for toggling work/break session
+   * @param saveConfig callback for saving configuration
+   * @param loadConfig callback for loading configuration
+   * @param requestBreakRecommendationNow callback for requesting a break recommendation
+   * @param acceptBreakRecommendation callback for accepting a break recommendation
+   * @param rejectBreakRecommendation callback for rejecting a break recommendation
+   */
   public ViewBuilder(ViewModel viewModel, Runnable switchWorkBreak, Runnable saveConfig,
       Runnable loadConfig, Runnable requestBreakRecommendationNow,
       Runnable acceptBreakRecommendation, Runnable rejectBreakRecommendation) {
@@ -97,8 +113,7 @@ public class ViewBuilder implements Builder<Region> {
     Button requestBreakRecommendationNowButton = new Button("Request break recommendation now");
     requestBreakRecommendationNowButton.setOnAction(e -> requestBreakRecommendationNow.run());
     DialogDisplay dialogDisplay;
-    dialogDisplay = new DialogDisplay(requestBreakRecommendationNow, acceptBreakRecommendation,
-        rejectBreakRecommendation);
+    dialogDisplay = new DialogDisplay(acceptBreakRecommendation, rejectBreakRecommendation);
     dialogDisplay.dialogStateProperty().bind(viewModel.dialogStateProperty());
     Label configFeedbackLabel = new Label();
     configFeedbackLabel.textProperty()

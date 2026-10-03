@@ -14,6 +14,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+/**
+ * Implementation of {@link RecommendationService} that uses the Groq API to generate break
+ * recommendations, with a fallback service for failures.
+ *
+ * The Groq API key is read from the environment variable {@code GROQ_API_KEY}.
+ */
 public class GroqRecommendationService implements RecommendationService {
 
   private static final String API_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -27,11 +33,22 @@ public class GroqRecommendationService implements RecommendationService {
   private final RecommendationService fallbackService;
   private final String apiKey;
 
+  /**
+   * Creates a service that reads the Groq API key from the {@code GROQ_API_KEY} environment
+   * variable.
+   */
   public GroqRecommendationService() {
     this(new DefaultGroqHttpClient(), new FallbackRecommendationService(),
         System.getenv("GROQ_API_KEY"));
   }
 
+  /**
+   * Creates a service with the given dependencies for swapping implementations.
+   *
+   * @param httpClient the HTTP client for API requests
+   * @param fallbackService the fallback service for failures
+   * @param apiKey the Groq API key, or null to use fallback immediately
+   */
   GroqRecommendationService(GroqHttpClient httpClient, RecommendationService fallbackService,
       String apiKey) {
     this.httpClient = httpClient;

@@ -2,6 +2,10 @@ package com.breaktimebuddy;
 
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Fallback implementation of {@link RecommendationService} that provides static break
+ * recommendations based on session count.
+ */
 public class FallbackRecommendationService implements RecommendationService {
   @Override
   public CompletableFuture<RecommendationResponse> getRecommendation(
