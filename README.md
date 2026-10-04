@@ -226,8 +226,6 @@ This separation allows recommendation logic to be tested independently and provi
 
 ## Security and Technical Limitations
 
-The current capstone implementation communicates with Groq from the desktop application when AI recommendations are enabled.
-
 Important current limitations include:
 
 - Environment-variable API-key handling is appropriate for local development but is not production-grade secret protection for a distributed desktop application.
