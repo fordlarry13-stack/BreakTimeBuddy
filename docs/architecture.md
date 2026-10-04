@@ -104,7 +104,7 @@ Toggling from work to break increments the completed-work-session count, closes 
 - `workingDuration`: elapsed time in the active work session.
 - `history`: a snapshot of recent completed work and break entries.
 
-Recommendation requests are ignored when no work session is active. An `AtomicBoolean` prevents a second request while one is pending. The interactor retains the current `CompletableFuture` and compares it by identity during completion, preventing a stale result from replacing newer state. Leaving the active work session clears displayed recommendation state and cancels the current request. Completion publishes a recommendation only when the future is still current, it completed without error, and the work session remains active.
+Recommendation requests are ignored when no work session is active. An `AtomicBoolean` prevents a second request while one is pending. The interactor retains the current `CompletableFuture<RecommendationResponse>` and compares it by identity during completion, preventing a stale result from replacing newer state. Leaving the active work session clears displayed recommendation state and cancels the current request. A response becomes visible only when the future is still current, it completed without error, the work session remains active, and `shouldBreak` is `true`. When `shouldBreak` is `false`, the pending state is cleared and no recommendation dialog is displayed.
 
 Each displayed recommendation receives a UUID. Accept and reject operations must present the matching ID, which prevents an action for an obsolete dialog from changing current state. Accepting a current recommendation switches an active work session to a break; rejecting it dismisses the recommendation without changing the session.
 
@@ -115,10 +115,17 @@ Each displayed recommendation receives a UUID. Accept and reject operations must
 `RecommendationService` abstracts recommendation generation with the current contract:
 
 ```java
-CompletableFuture<String> getRecommendation(RecommendationRequest request);
+CompletableFuture<RecommendationResponse> getRecommendation(RecommendationRequest request);
 ```
 
 The asynchronous contract allows the interactor to publish pending state while a provider request is in progress. `GroqRecommendationService` is the production implementation, and `FallbackRecommendationService` supplies deterministic local recommendations.
+
+`RecommendationResponse` is an immutable record with two fields:
+
+- `shouldBreak`: whether the service recommends taking a break.
+- `activity`: the recommended break activity when `shouldBreak` is `true`.
+
+A false `shouldBreak` value represents a valid no-break response. A true value carries the activity that the interactor can expose in the recommendation dialog.
 
 ### GroqRecommendationService
 
@@ -130,26 +137,30 @@ Provider reliability behavior is bounded:
 
 - At most three attempts are made.
 - Retries wait one second.
-- HTTP `429` responses and `5xx` responses are retried while attempts remain.
+- HTTP `429` responses and status codes `500` or higher are retried while attempts remain.
 - Asynchronous or network failures are retried while attempts remain.
 - Other non-success HTTP responses use the fallback without retry.
 - Exhausted retries use the fallback.
 
-For an HTTP `200` response, the service extracts `choices[0].message.content`. A response is valid only when it is non-null, nonblank, contains no `<think>` or `</think>` tags, contains no defined medical-advice terms, and has no more than 30 whitespace-delimited words. Invalid or malformed responses use the fallback.
+The request asks Groq for a JSON-schema response named `breakRecommendation`. The schema describes an object with a required Boolean `shouldBreak` property and an `activity` string property, disallows additional properties, and uses non-strict schema mode. The service extracts `choices[0].message.content` and parses that content as the structured object before converting it to `RecommendationResponse`.
 
-The defined medical-advice filter rejects responses containing terms related to named pain medicines, medication or medicine, dosage or dose, diagnosis, treatment, prescriptions, prescribing, taking a pain reliever, or starting/stopping medication. This is a limited string-based validation layer, not a comprehensive medical-safety system.
+A response with `shouldBreak` set to `false` is accepted as a no-break response, and its activity is normalized to an empty string. If `shouldBreak` is `true`, `activity` must be present and non-null; it is trimmed and must remain nonblank. The activity must not contain `<think>` or `</think>` tags, must not contain any defined medical-advice term, and must contain no more than 30 whitespace-delimited words. Missing content, malformed JSON, an invalid structured response, or an invalid break activity causes the service to use the fallback.
 
-The Groq prompt includes completed work-session count, preferred work duration, current continuous work duration, and the phase and duration of recent completed work and break sessions. It asks for one short, healthy break activity under 30 words, excludes medical advice, and requests only the recommendation text.
+The medical-advice filter lowercases the activity and rejects it if it contains any of these defined strings: `ibuprofen`, `aspirin`, `acetaminophen`, `medication`, `medicine`, `dosage`, `dose`, `diagnose`, `diagnosis`, `treatment`, `prescription`, `prescribe`, `take a pain reliever`, `take pain reliever`, `stop taking`, or `start taking`. This is a limited string-based validation layer, not a comprehensive medical-safety system.
+
+The Groq prompt includes completed work-session count, preferred work duration, current continuous work duration, and the phase and duration of recent completed work and break sessions. When history is empty, the prompt states that the user has not completed any sessions. It asks Groq to decide whether the user should take a break and, only if so, recommend one short, healthy break activity under 30 words without medical advice.
 
 ## Fallback Recommendation
 
-`FallbackRecommendationService` does not call Groq and returns an already-completed `CompletableFuture<String>`. It selects fixed recommendation text from the completed work-session count:
+`FallbackRecommendationService` does not call Groq and returns an already-completed `CompletableFuture<RecommendationResponse>`. It sets `shouldBreak` to `true` only when `workingDuration` is strictly greater than 80% of `preferredWorkLength`. At exactly 80%, or below that threshold, it returns `shouldBreak` as `false` with an empty activity.
+
+When the threshold is exceeded, it selects a fixed activity from the completed work-session count:
 
 - Four or more sessions: a 10-minute break with walking, stretching, and water.
 - Two or three sessions: a 5-minute break and stretching.
 - Zero or one session: a short break to rest the eyes.
 
-This fallback is used when no Groq credential is configured and when the Groq integration cannot produce a valid recommendation.
+This fallback is used when no Groq credential is configured and when the Groq integration cannot produce a valid response. Because the fallback applies its duration threshold in every case, fallback use does not necessarily produce a recommendation dialog.
 
 ## Persistence
 
@@ -195,9 +206,10 @@ For persistence actions, the interactor additionally calls `ConfigHandler`, whic
 3. `Controller` delegates to `Interactor`.
 4. The interactor creates a `RecommendationRequest` and calls `RecommendationService`.
 5. `GroqRecommendationService` uses Groq when configured or delegates to `FallbackRecommendationService` when needed.
-6. The returned `CompletableFuture<String>` completes asynchronously.
-7. The interactor validates that the result is current and that work remains active, then publishes updated `State`.
-8. The controller updates `ViewModel`, and the recommendation UI becomes visible.
+6. The returned `CompletableFuture<RecommendationResponse>` completes asynchronously.
+7. The interactor validates that the result is current and that work remains active.
+8. If `shouldBreak` is `true`, the interactor publishes the activity in `State`, the controller updates `ViewModel`, and the recommendation UI becomes visible.
+9. If `shouldBreak` is `false`, the interactor clears the pending request and publishes state without a recommendation dialog.
 
 ## Local vs External Data Boundary
 
@@ -223,8 +235,8 @@ The current architecture includes the following verified controls:
 - Leaving work state clears and cancels the current recommendation request.
 - HTTP connection and request operations use 10-second timeouts.
 - Retry attempts are capped at three with a one-second delay.
-- Provider failures and invalid responses fall back to local recommendations.
-- Groq responses are checked for required content, reasoning tags, selected medical-advice terms, and the 30-word maximum.
+- Provider failures and invalid responses use the local fallback, which independently decides whether its duration threshold has been exceeded.
+- Structured Groq responses are converted to `RecommendationResponse`; when a break is recommended, validation requires a nonblank activity without reasoning tags or selected medical-advice terms and within the 30-word maximum.
 - Configuration save/load exceptions are caught by the controller and displayed as timestamped UI feedback.
 
 ## Testing and CI
@@ -242,7 +254,7 @@ GitHub Actions defines a **Java CI** workflow for pushes and pull requests targe
 mvn -B verify
 ```
 
-This document does not assert a final test count or performance result.
+Final integrated local verification on October 3, 2026 recorded 77 tests, with 0 failures, 0 errors, and 0 skipped. No coverage percentage or performance benchmark is asserted.
 
 ## Architectural Limitations / Future Direction
 
@@ -282,4 +294,4 @@ A future production architecture could introduce a backend or proxy for centrali
 
 ## Final Release Note
 
-This document reflects the current `develop`-branch architecture at documentation review time and must receive a final accuracy review after approved pending pull requests are merged and before `develop` is promoted to `main`.
+This document reflects the current `develop`-branch architecture at final documentation review time.
