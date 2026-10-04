@@ -71,7 +71,7 @@ mvn clean javafx:run
 
 Do not commit a real API key to the repository.
 
-If `GROQ_API_KEY` is missing, blank, or the Groq service cannot return a valid recommendation, the application can use its rule-based fallback.
+If `GROQ_API_KEY` is missing, blank, or the Groq service cannot return a valid recommendation, the application uses its rule-based fallback.
 
 Using an environment variable reduces the risk of accidentally committing the credential to source control, but it is not production-grade secret protection for a distributed desktop application.
 
@@ -108,9 +108,9 @@ RecommendationService
     +----> FallbackRecommendationService
 ```
 
-When Groq is configured, the application can request an AI-generated recommendation. The service validates responses before they are used by the application.
+When Groq is configured, the application can request an AI-generated recommendation. The recommendation service returns a `RecommendationResponse` containing a `shouldBreak` decision and an activity when a break is recommended. If `shouldBreak` is `false`, the application does not display a break recommendation dialog.
 
-The fallback service allows the recommendation feature to continue operating when the AI provider is unavailable, not configured, or does not return an acceptable response.
+AI responses are validated before they are used by the application. The fallback service allows the recommendation feature to continue operating when the AI provider is unavailable, not configured, or does not return an acceptable response.
 
 The Groq integration also includes bounded retry behavior for selected transient failures and request timeouts so provider failures do not indefinitely block the recommendation workflow.
 
@@ -126,7 +126,7 @@ The application also supports a non-AI rule-based fallback, so a live AI provide
 
 Break Time Buddy stores supported configuration information locally in `config.json`.
 
-Saved data can include:
+Saved data includes the following:
 
 - Completed work-session count
 - Preferred work-session length
@@ -144,7 +144,7 @@ Run the automated test suite with:
 mvn clean test
 ```
 
-The test suite covers areas including:
+The test suite covers the following areas:
 
 - Configuration validation and persistence
 - Work and break history
@@ -158,7 +158,9 @@ The test suite covers areas including:
 
 AI-related automated tests use controlled test implementations rather than requiring a live Groq API request, allowing the automated suite and CI pipeline to run without a real provider credential.
 
-For a full Maven verification build, run:
+Final integrated verification on October 3, 2026 completed **77 tests with 0 failures, 0 errors, and 0 skipped tests**.
+
+For a full Maven verification build, run the following command:
 
 ```bash
 mvn -B verify
@@ -166,7 +168,7 @@ mvn -B verify
 
 ## Packaging
 
-Create the application artifacts with:
+Create the application artifacts with the following command:
 
 ```bash
 mvn clean package
@@ -176,20 +178,14 @@ Maven generates build output under the `target/` directory, including the projec
 
 ## Continuous Integration
 
-The repository includes a GitHub Actions Java CI workflow.
+The repository includes a GitHub Actions Java CI workflow. For pushes and pull requests targeting `develop`, it runs the following processes:
 
-For pushes and pull requests targeting `develop`, the workflow:
+1. Check out the repository.
+2. Configure Temurin Java 17.
+3. Use Maven dependency caching.
+4. Run `mvn -B verify`.
 
-1. Checks out the repository.
-2. Configures Temurin Java 17.
-3. Uses Maven dependency caching.
-4. Runs:
-
-```bash
-mvn -B verify
-```
-
-Pull requests should pass the CI workflow before integration into the shared development branch.
+Pull requests must pass the CI workflow before integration into the shared development branch.
 
 ## Repository Structure
 
@@ -246,12 +242,13 @@ A future production architecture could place AI communication behind a backend o
 
 Project documentation is maintained in the `docs/` directory.
 
-Current documentation includes:
+Current and final-release documentation includes:
 
 - `docs/architecture.md` — architecture and component information.
 - `docs/ai-recommendation-service.md` — AI recommendation implementation, validation, fallback, and testing information.
+- `docs/api-documentation.md` — API documentation guidelines.
 
-Final-release installation, user, and API documentation are also being prepared as part of the release documentation set.
+Additional installation, user, and developer documentation is being finalized through the team's documentation pull requests.
 
 ## Team
 
