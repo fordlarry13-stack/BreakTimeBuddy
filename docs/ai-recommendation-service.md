@@ -2,17 +2,20 @@
 
 ## Overview
 
-The Break Time Buddy Alpha includes a client-side AI recommendation service that provides short break recommendations based on the number of completed work sessions.
+Break Time Buddy includes an AI-assisted recommendation service that helps determine whether a user should take a break and, when appropriate, provides a short break activity.
 
-The AI functionality is separated behind the `RecommendationService` interface. This keeps the implementation modular and allows the AI provider to be changed later without requiring major changes to the rest of the application.
+The AI functionality is separated behind the `RecommendationService` interface. This keeps the recommendation logic modular and allows the AI provider or fallback implementation to be changed without requiring major changes to the rest of the application.
 
-For the Alpha release, Groq is used as the AI provider.
+The current implementation uses Groq as the external AI provider and `FallbackRecommendationService` as a rule-based fallback.
 
 ## Architecture
 
-The current AI recommendation flow is:
+The recommendation flow is:
 
 ```text
+Active work session
+        |
+        v
 RecommendationRequest
         |
         v
@@ -23,22 +26,32 @@ GroqRecommendationService
         |
         v
 Groq API
+        |
+        v
+RecommendationResponse
+   |               |
+shouldBreak=false  shouldBreak=true
+   |               |
+No dialog          Display break recommendation
 ```
 
-If the Groq request fails or the response is invalid, the application uses:
+If the Groq service cannot be used or returns an invalid response, the application delegates to:
 
 ```text
 FallbackRecommendationService
         |
         v
-Rule-based break recommendation
+Rule-based break decision
+        |
+        v
+RecommendationResponse
 ```
 
-`GroqHttpClient` provides an abstraction around the HTTP request. `DefaultGroqHttpClient` provides the production HTTP implementation. This separation allows automated tests to use a fake HTTP client without making real network requests.
+`GroqHttpClient` provides an abstraction around HTTP communication, while `DefaultGroqHttpClient` provides the runtime HTTP implementation. This separation allows automated tests to inject a fake HTTP client without making live network requests.
 
-## AI Provider Configuration
+## AI provider configuration
 
-The Alpha implementation uses Groq with the following model:
+The current Groq integration uses the following model:
 
 ```text
 qwen/qwen3.8-27b
@@ -46,7 +59,7 @@ qwen/qwen3.8-27b
 
 The Groq API key is read from the `GROQ_API_KEY` environment variable.
 
-For local development:
+For local development on macOS or Linux:
 
 ```bash
 export GROQ_API_KEY="your-api-key"
@@ -54,46 +67,95 @@ export GROQ_API_KEY="your-api-key"
 
 The actual API key must never be committed to the Git repository.
 
-If the API key is missing, the recommendation service uses the fallback service instead of causing the application to fail.
+If the API key is missing or blank, the application immediately uses the fallback recommendation service rather than failing the recommendation feature.
 
-## Recommendation Input
+## Recommendation input
 
-The current `RecommendationRequest` contains the number of completed work sessions.
+`RecommendationRequest` provides the recommendation service with four pieces of session context:
 
-The session count provides the recommendation service with a factor that can be used when generating an appropriate break recommendation.
+- Number of completed work sessions.
+- Preferred work-session length.
+- Duration of the current work session.
+- Recent completed work and break history.
 
-Additional factors can be added in future versions.
+Recent history includes the phase and duration of completed work and break sessions. This gives the recommendation service more context than relying on completed session count alone.
 
-## Response Validation
+The application creates the request while a work session is active and passes a copy of the recent history to the recommendation service.
 
-AI responses are validated before they are returned to the application.
+## Recommendation response
 
-The current validation checks that:
+The recommendation service returns a `RecommendationResponse` containing:
 
-- The recommendation is not null or blank.
-- The recommendation is no more than 30 words.
-- Exposed reasoning tags such as `<think>` are rejected.
-- Invalid JSON responses do not cause the application to crash.
+- `shouldBreak` — whether a break should currently be recommended.
+- `activity` — the recommended break activity when `shouldBreak` is `true`.
 
-If validation fails, the fallback recommendation service is used.
+If `shouldBreak` is `false`, the application does not display a recommendation dialog.
 
-## Retry and Error Handling
+If `shouldBreak` is `true`, the recommendation activity is displayed to the user. Accepting the recommendation ends the current work period and starts a break. Rejecting it dismisses the recommendation without starting a break.
 
-The Groq service uses up to three total attempts, including the initial request.
+This design allows the recommendation service to decide that a break is not yet appropriate instead of always displaying a break suggestion.
 
-The service retries transient failures including:
+## Groq request and structured response
+
+The Groq prompt includes:
+
+- Completed work-session count.
+- Preferred work-session length.
+- Current continuous work duration.
+- Recent completed work and break history.
+
+The prompt asks the model to decide whether the user should take a break. When a break is appropriate, it requests one short, healthy activity under 30 words and instructs the model not to provide medical advice.
+
+The Groq request uses a JSON schema requiring the `shouldBreak` Boolean field. The `activity` field is used when a break is recommended.
+
+Model reasoning is configured as hidden.
+
+## Response validation
+
+AI-generated activities are validated before being displayed.
+
+When `shouldBreak` is `true`, validation verifies that the activity:
+
+- Is not null or blank.
+- Contains no more than 30 words.
+- Does not expose reasoning tags such as `<think>`.
+- Does not contain configured medical-advice terms, including medication, dosage, diagnosis, treatment, prescription, or named pain-relief medications.
+
+Malformed JSON, missing required activity data, or other invalid responses are rejected.
+
+If an AI response requiring an activity fails validation, the application uses the fallback recommendation service instead of displaying the invalid response.
+
+## Retry and error handling
+
+The Groq service supports up to three total request attempts, including the initial attempt.
+
+It retries transient failures including:
 
 - HTTP 429 rate-limit responses.
 - HTTP 5xx server responses.
 - Network or asynchronous request failures.
 
-Non-transient responses such as HTTP 401 are not retried.
+Non-retryable HTTP responses, such as HTTP 401, fall back without performing the normal retry sequence.
 
-A one-second delay is currently used between retry attempts.
+The current implementation uses a one-second delay between retry attempts. Each HTTP request has a 10-second timeout.
 
-Each HTTP request has a 10-second timeout. The limited number of attempts was selected to keep failure handling within the project's performance target while still providing retry behavior.
+After retry attempts are exhausted, the application delegates to `FallbackRecommendationService`. This prevents external AI-provider failures from breaking the recommendation feature.
 
-## Automated Testing Procedure
+## Rule-based fallback
+
+`FallbackRecommendationService` allows the application to make a break decision without Groq.
+
+The fallback compares the current work duration with the user's preferred work-session length. A break is recommended when the current working duration is greater than 80% of the preferred work length.
+
+When a break is recommended, the activity varies according to the number of completed work sessions:
+
+- Four or more completed sessions: a 10-minute break with walking, stretching, and water.
+- Two or three completed sessions: a 5-minute stretching break.
+- Fewer than two completed sessions: a short break to rest the eyes.
+
+If the current work duration has not exceeded the threshold, the fallback returns `shouldBreak=false` and no break activity is displayed.
+
+## Automated testing
 
 Run the complete automated test suite from the project root:
 
@@ -101,148 +163,149 @@ Run the complete automated test suite from the project root:
 mvn clean test
 ```
 
-During Alpha development, the verified result was:
+The final integrated `develop` build at commit `045053e` was verified on October 3, 2026 with:
 
 ```text
-Tests run: 42
+Tests run: 77
 Failures: 0
 Errors: 0
 Skipped: 0
 BUILD SUCCESS
 ```
 
-The AI-related automated tests cover:
+This represents a 100% passing test run.
 
-- Valid AI response handling.
-- Invalid JSON handling.
+AI and recommendation-related automated testing includes scenarios for:
+
+- Structured recommendation responses.
+- Break and no-break decisions.
+- Invalid JSON responses.
+- Missing or invalid activity data.
 - Responses exceeding the 30-word limit.
+- Medical-advice validation.
 - Missing API key fallback.
 - HTTP 429 retry behavior.
-- HTTP 500 retry behavior.
-- Network failure retry behavior.
-- HTTP 401 no-retry behavior.
-- Rule-based fallback recommendations.
-- Recommendation service invocation from the session flow.
-- Successful recommendation updates to the existing dialog state.
+- HTTP 5xx retry behavior.
+- Network and asynchronous failures.
+- Non-retryable HTTP responses.
+- Rule-based fallback behavior.
+- Recommendation-service integration with the session flow.
+- Recommendation acceptance and rejection.
 - Failed and stale asynchronous recommendation handling.
 
-The Groq unit tests use an injected fake HTTP client. Therefore, automated tests and CI do not require a real Groq API key or a live network request.
+The Groq unit tests use an injected fake HTTP client. Therefore, automated tests and CI do not require a real Groq API key or live Groq request.
 
-## Manual AI Testing Procedure
+## Manual AI testing
 
-The real Java-to-Groq integration was also manually verified during Alpha development.
+The recommendation flow can also be verified manually.
 
 ### Setup
 
-Set the API key locally:
+Set the Groq API key locally:
 
 ```bash
 export GROQ_API_KEY="your-api-key"
 ```
 
-Do not place the real key in source code, documentation, commits, or test files.
+Do not place a real API key in source code, documentation, commits, or test files.
 
 ### Verification
 
-A real request was sent through the Java `GroqRecommendationService` to the Groq API.
+While a work session is active, request a recommendation and verify the resulting behavior.
 
-The service successfully received, parsed, validated, and returned a break recommendation.
+Because AI responses are nondeterministic, testing should validate behavior rather than require an exact sentence.
 
-One observed result was:
+When the service decides a break is appropriate, verify that:
 
-```text
-Step outside for a brisk 5-minute walk to stretch your legs and refresh your mind.
-```
+- A recommendation dialog is displayed.
+- The activity is concise and non-empty.
+- The activity does not exceed the configured word limit.
+- The activity does not expose model reasoning.
+- Accepting the recommendation starts a break.
+- Rejecting the recommendation dismisses it.
 
-AI responses are nondeterministic, so manual testing should not require this exact sentence.
+When the service determines that a break is not appropriate, verify that no recommendation dialog is displayed.
 
-Instead, verify that the response:
+The fallback path can be tested by running the application without `GROQ_API_KEY`.
 
-- Is not empty.
-- Contains a reasonable break recommendation.
-- Is concise.
-- Does not exceed the configured word limit.
-- Does not expose model reasoning.
+## Reliability and graceful degradation
 
-## Fallback Testing
-
-The application must continue to provide a recommendation when the AI service cannot be used.
+The recommendation feature is designed so that the external AI provider is not a single point of failure.
 
 Fallback behavior can occur when:
 
-- `GROQ_API_KEY` is missing.
-- The provider returns an invalid response.
-- Retryable failures continue after all attempts.
-- Response validation fails.
+- `GROQ_API_KEY` is unavailable.
+- The provider returns an invalid or malformed response.
+- A required break activity is missing or invalid.
+- The response fails safety validation.
+- A non-retryable HTTP error occurs.
+- Retryable failures continue through all attempts.
+- Network or asynchronous failures persist.
 
-`FallbackRecommendationService` provides simple rule-based recommendations based on the completed session count.
+This allows the application to continue making break decisions even when the external AI service is unavailable.
 
-This prevents an AI provider failure from breaking the core recommendation feature.
+## Technical debt and potential resolutions
 
-## Technical Debt and Potential Resolutions
-
-### 1. Direct Desktop-to-AI Communication
-
-**Technical debt:**
-For the Alpha release, the Java desktop application communicates directly with the Groq API.
-
-**Impact:**
-A distributed desktop application cannot securely protect a provider API key in a production environment.
-
-**Potential resolution:**
-Move AI communication to a backend or proxy service. The backend would securely store the provider credential, while the JavaFX client would communicate only with the application's backend.
-
-### 2. Fixed Retry Delay
+### Direct desktop-to-AI communication
 
 **Technical debt:**
-The current implementation uses a fixed one-second delay between retry attempts.
+The Java desktop application currently communicates directly with the Groq API.
 
 **Impact:**
-A fixed delay may not be optimal during rate limiting or longer provider outages.
+A distributed desktop application cannot securely protect a provider credential because secrets stored on a client device may be extracted.
 
 **Potential resolution:**
-Implement exponential backoff and support the provider's `Retry-After` information when available.
+Move AI communication to a backend or proxy service. The backend could securely store provider credentials while the JavaFX application communicates with the application's backend over HTTPS.
 
-### 3. Limited Recommendation Inputs
+### Fixed retry delay
 
 **Technical debt:**
-The current recommendation request primarily uses completed session count.
+The implementation uses a fixed one-second delay between retry attempts.
 
 **Impact:**
-The AI has limited information available for personalization.
+A fixed delay may be inefficient during extended provider outages or rate limiting.
 
 **Potential resolution:**
-Expand `RecommendationRequest` to include relevant information such as break preferences, work-session duration, and recent break history as those modules become available.
+Use exponential backoff and honor provider retry guidance such as `Retry-After` when available.
 
-### 4. Basic AI Response Validation
+### Client-side service protection
 
 **Technical debt:**
-Current validation focuses mainly on response format and length.
+The current architecture does not include a project-owned backend between the desktop client and external AI service.
 
 **Impact:**
-It does not perform advanced semantic evaluation of every recommendation.
+Server-side controls such as centralized request validation, rate limiting, credential isolation, and service-level monitoring cannot be fully implemented in the current client-only architecture.
 
 **Potential resolution:**
-Add stronger validation and testing for recommendation relevance, safety, and consistency.
+Introduce a backend/proxy layer if the application progresses beyond the current desktop project architecture.
 
-## Alpha Status
+### AI recommendation validation
 
-The AI recommendation module currently provides:
+**Technical debt:**
+The application validates response structure, length, exposed reasoning, and a configured set of medical-advice terms, but it cannot guarantee the semantic quality of every nondeterministic AI response.
 
-- A modular `RecommendationService` interface.
+**Impact:**
+A syntactically valid response may still be less useful or relevant than expected.
+
+**Potential resolution:**
+Expand safety and relevance test cases, introduce additional semantic validation where appropriate, and continue evaluating recommendation quality using representative scenarios.
+
+## Final release status
+
+The final recommendation module provides:
+
+- A modular `RecommendationService` abstraction.
 - Groq AI integration.
-- Asynchronous HTTP requests.
-- Environment-variable API key handling.
-- JSON response parsing.
-- Response validation.
-- Retry and error handling.
-- Rule-based fallback recommendations.
-- Automated unit tests.
-- Manual live API verification.
-- Integration with the JavaFX session and recommendation-dialog flow.
+- Conditional break/no-break decisions.
+- Context from current duration, preferred work length, completed sessions, and recent history.
+- Structured `RecommendationResponse` handling.
+- Asynchronous HTTP communication.
+- Environment-variable API key configuration.
+- Structured JSON response parsing.
+- Activity validation and medical-advice filtering.
+- Retry and timeout handling.
+- Rule-based graceful fallback.
+- Automated testing without live external requests.
+- Integration with the JavaFX session and recommendation-dialog lifecycle.
 
-The recommendation service is connected to the application's session flow. Recommendation
-requests are handled asynchronously and successful results are published through the existing
-`DialogState` and `DialogDisplay` lifecycle. A recommendation displayed in the JavaFX interface
-may come from Groq or from `FallbackRecommendationService`, depending on provider availability,
-response validity, and retry outcomes.
+The recommendation service is integrated with the application's active work-session flow. A recommendation dialog is created only when the resulting `RecommendationResponse` indicates that a break should be taken. Provider failures and invalid responses degrade to deterministic fallback behavior rather than disabling the recommendation feature.
