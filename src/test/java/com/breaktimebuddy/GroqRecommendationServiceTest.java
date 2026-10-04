@@ -1,8 +1,6 @@
 package com.breaktimebuddy;
 
-import org.junit.jupiter.api.Test;
-
-import javax.net.ssl.SSLSession;
+import static org.junit.jupiter.api.Assertions.*;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
@@ -13,19 +11,35 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import javax.net.ssl.SSLSession;
+import org.junit.jupiter.api.Test;
 
 class GroqRecommendationServiceTest {
-
   @Test
   void returnsAiRecommendationWhenResponseIsValid() {
+    GroqHttpClient client = request -> CompletableFuture.completedFuture(response(200,
+        wellFormedResponseRecommendingBreakWithActivity("Stand up and stretch for five minutes.")));
+
+    GroqRecommendationService service =
+        new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
+
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
+
+    assertTrue(result.shouldBreak());
+    assertEquals("Stand up and stretch for five minutes.", result.activity());
+  }
+
+  @Test
+  void returnsNoRecommendationWhenResponseIsValidNoRecommendation() {
     GroqHttpClient client = request -> CompletableFuture.completedFuture(response(200, """
         {
           "choices": [
             {
               "message": {
-                "content": "Stand up and stretch for five minutes."
+                "content": "{\\"shouldBreak\\":false}"
               }
             }
           ]
@@ -35,10 +49,12 @@ class GroqRecommendationServiceTest {
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Stand up and stretch for five minutes.", result);
+    assertFalse(result.shouldBreak());
   }
 
   @Test
@@ -49,37 +65,34 @@ class GroqRecommendationServiceTest {
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Take a 5-minute break and stretch.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a 5-minute break and stretch.", result.activity());
   }
 
   @Test
   void usesFallbackWhenRecommendationIsTooLong() {
     String longRecommendation = "word ".repeat(31).trim();
 
-    String body = """
-        {
-          "choices": [
-            {
-              "message": {
-                "content": "%s"
-              }
-            }
-          ]
-        }
-        """.formatted(longRecommendation);
+    String body = wellFormedResponseRecommendingBreakWithActivity(longRecommendation);
 
     GroqHttpClient client = request -> CompletableFuture.completedFuture(response(200, body));
 
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(4, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(4, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Take a 10-minute break. Walk around, stretch, and drink some water.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a 10-minute break. Walk around, stretch, and drink some water.",
+        result.activity());
   }
 
   @Test
@@ -91,10 +104,13 @@ class GroqRecommendationServiceTest {
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(1, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(1, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Take a short break and rest your eyes.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a short break and rest your eyes.", result.activity());
   }
 
 
@@ -110,26 +126,20 @@ class GroqRecommendationServiceTest {
         return CompletableFuture.completedFuture(response(429, "{}"));
       }
 
-      return CompletableFuture.completedFuture(response(200, """
-          {
-            "choices": [
-              {
-                "message": {
-                  "content": "Take a short walk and stretch."
-                }
-              }
-            ]
-          }
-          """));
+      return CompletableFuture.completedFuture(response(200,
+          wellFormedResponseRecommendingBreakWithActivity("Take a short walk and stretch.")));
     };
 
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(2, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(2, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Take a short walk and stretch.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a short walk and stretch.", result.activity());
 
     assertEquals(2, calls.get());
   }
@@ -146,26 +156,21 @@ class GroqRecommendationServiceTest {
         return CompletableFuture.completedFuture(response(500, "{}"));
       }
 
-      return CompletableFuture.completedFuture(response(200, """
-          {
-            "choices": [
-              {
-                "message": {
-                  "content": "Rest your eyes and take a brief stretch."
-                }
-              }
-            ]
-          }
-          """));
+      return CompletableFuture
+          .completedFuture(response(200, wellFormedResponseRecommendingBreakWithActivity(
+              "Rest your eyes and take a brief stretch.")));
     };
 
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(2, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(2, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Rest your eyes and take a brief stretch.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Rest your eyes and take a brief stretch.", result.activity());
 
     assertEquals(2, calls.get());
   }
@@ -182,26 +187,21 @@ class GroqRecommendationServiceTest {
         return CompletableFuture.failedFuture(new RuntimeException("Simulated network failure"));
       }
 
-      return CompletableFuture.completedFuture(response(200, """
-          {
-            "choices": [
-              {
-                "message": {
-                  "content": "Stand up, breathe, and stretch for a few minutes."
-                }
-              }
-            ]
-          }
-          """));
+      return CompletableFuture
+          .completedFuture(response(200, wellFormedResponseRecommendingBreakWithActivity(
+              "Stand up, breathe, and stretch for a few minutes.")));
     };
 
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Stand up, breathe, and stretch for a few minutes.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Stand up, breathe, and stretch for a few minutes.", result.activity());
 
     assertEquals(2, calls.get());
   }
@@ -220,45 +220,78 @@ class GroqRecommendationServiceTest {
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Take a 5-minute break and stretch.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a 5-minute break and stretch.", result.activity());
 
     assertEquals(1, calls.get());
   }
 
   @Test
   void usesFallbackWhenRecommendationContainsMedicalAdvice() {
-    GroqHttpClient client = request -> CompletableFuture.completedFuture(response(200, """
-        {
-          "choices": [
-            {
-              "message": {
-                "content": "Take ibuprofen for your headache and rest for five minutes."
-              }
-            }
-          ]
-        }
-        """));
+    GroqHttpClient client = request -> CompletableFuture
+        .completedFuture(response(200, wellFormedResponseRecommendingBreakWithActivity(
+            "Take ibuprofen for your headache and rest for five minutes.")));
 
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(25), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Take a 5-minute break and stretch.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a 5-minute break and stretch.", result.activity());
   }
 
   @Test
   void usesFallbackWhenRecommendationContainsTreatmentAdvice() {
+    GroqHttpClient client = request -> CompletableFuture
+        .completedFuture(response(200, wellFormedResponseRecommendingBreakWithActivity(
+            "Start taking a pain reliever as treatment for your headache.")));
+
+    GroqRecommendationService service =
+        new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
+
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
+
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a 5-minute break and stretch.", result.activity());
+  }
+
+  @Test
+  void usesFallbackWhenBreakWithNoActivity() {
+    GroqHttpClient client = request -> CompletableFuture
+        .completedFuture(response(200, wellFormedResponseRecommendingBreakWithActivity("")));
+
+    GroqRecommendationService service =
+        new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
+
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
+
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a 5-minute break and stretch.", result.activity());
+  }
+
+  @Test
+  void usesFallbackWhenContentIsInvalid() {
     GroqHttpClient client = request -> CompletableFuture.completedFuture(response(200, """
         {
           "choices": [
             {
               "message": {
-                "content": "Start taking a pain reliever as treatment for your headache."
+                "content": "{invalid json}"
               }
             }
           ]
@@ -268,10 +301,13 @@ class GroqRecommendationServiceTest {
     GroqRecommendationService service =
         new GroqRecommendationService(client, new FallbackRecommendationService(), "test-api-key");
 
-    String result = service
-        .getRecommendation(new RecommendationRequest(3, Duration.ofMinutes(25), Duration.ofMinutes(10), List.of())).join();
+    RecommendationResponse result = service
+        .getRecommendation(
+            new RecommendationRequest(3, Duration.ofMinutes(10), Duration.ofMinutes(10), List.of()))
+        .join();
 
-    assertEquals("Take a 5-minute break and stretch.", result);
+    assertTrue(result.shouldBreak());
+    assertEquals("Take a 5-minute break and stretch.", result.activity());
   }
 
   private static HttpResponse<String> response(int statusCode, String body) {
@@ -317,5 +353,19 @@ class GroqRecommendationServiceTest {
         return HttpClient.Version.HTTP_1_1;
       }
     };
+  }
+
+  static String wellFormedResponseRecommendingBreakWithActivity(String activity) {
+    return """
+        {
+          "choices": [
+            {
+              "message": {
+                "content": "{\\"shouldBreak\\":true,\\"activity\\":\\"%s\\"}"
+              }
+            }
+          ]
+        }
+        """.formatted(activity);
   }
 }
