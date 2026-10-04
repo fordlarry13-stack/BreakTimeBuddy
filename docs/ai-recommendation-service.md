@@ -173,7 +173,7 @@ Skipped: 0
 BUILD SUCCESS
 ```
 
-This represents a 100% passing test run.
+All 77 executed tests passed, with 0 failures, 0 errors, and 0 skipped tests.
 
 AI and recommendation-related automated testing includes scenarios for:
 
