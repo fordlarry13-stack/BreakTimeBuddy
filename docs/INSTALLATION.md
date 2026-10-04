@@ -136,8 +136,6 @@ Break Time Buddy uses a local file named `config.json`.
 
 The application uses this file for locally saved application configuration, including supported session-related preferences and data.
 
-The Groq API key does not belong in `config.json`. Configure it only through the `GROQ_API_KEY` environment variable.
-
 ## Troubleshooting
 
 ### Java version is incorrect
@@ -211,4 +209,4 @@ $env:GROQ_API_KEY
 
 Do not share the resulting value.
 
-If the key is absent, Break Time Buddy can continue operating through its rule-based fallback recommendation service.
+If the key is absent, Break Time Buddy can continue operating through its rule-based fallback recommendation engine.
