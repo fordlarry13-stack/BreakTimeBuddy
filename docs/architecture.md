@@ -4,6 +4,8 @@
 
 Break Time Buddy is a Java 17 and JavaFX desktop application for managing work and break sessions and providing short break recommendations. Its design separates presentation, controller/application coordination, session and domain logic, persistence, and recommendation/AI integration.
 
+This document is intended for developers and technical stakeholders who need to understand, maintain, review, or extend Break Time Buddy.
+
 - The presentation layer builds the JavaFX interface and exposes observable UI state.
 - The controller coordinates user actions and state updates between the interface and application logic.
 - The interactor owns session behavior, history, configuration coordination, and recommendation-request state.
@@ -88,8 +90,7 @@ Configuration save and load operations are currently synchronous. The controller
 - Tracking whether a work session is active.
 - Counting completed work sessions.
 - Maintaining the preferred work duration.
-- Recording completed work and break entries in newest-first order.
-- Limiting recent history to 20 entries.
+- Recording the 20 most recently completed work and break entries in newest-first order.
 - Coordinating save and load operations through `ConfigHandler`.
 - Creating contextual recommendation requests during an active work session.
 - Handling asynchronous recommendation completion.
@@ -106,7 +107,7 @@ Toggling from work to break increments the completed-work-session count, closes 
 
 Recommendation requests are ignored when no work session is active. An `AtomicBoolean` prevents a second request while one is pending. The interactor retains the current `CompletableFuture<RecommendationResponse>` and compares it by identity during completion, preventing a stale result from replacing newer state. Leaving the active work session clears displayed recommendation state and cancels the current request. A response becomes visible only when the future is still current, it completed without error, the work session remains active, and `shouldBreak` is `true`. When `shouldBreak` is `false`, the pending state is cleared and no recommendation dialog is displayed.
 
-Each displayed recommendation receives a UUID. Accept and reject operations must present the matching ID, which prevents an action for an obsolete dialog from changing current state. Accepting a current recommendation switches an active work session to a break; rejecting it dismisses the recommendation without changing the session.
+Each displayed recommendation receives a UUID. The interactor compares the ID supplied by an accept or reject action with the ID of the currently displayed dialog state and ignores a nonmatching ID. This ensures that actions apply only while the supplied ID matches the current dialog state, preventing actions associated with an outdated dialog from changing current state during asynchronous recommendation processing. Accepting the current recommendation switches an active work session to a break; rejecting it dismisses the recommendation without changing the session.
 
 ## Recommendation / AI Layer
 
@@ -190,26 +191,23 @@ Sanitization provides defaults or corrections for invalid data:
 
 ### Session and Configuration Flow
 
-1. The user activates a control created by `ViewBuilder`.
-2. The control invokes a callback supplied by `Controller`.
-3. The controller calls the corresponding `Interactor` operation.
-4. The interactor updates domain state and publishes a `State` snapshot.
-5. The controller transfers that snapshot to `ViewModel`, using the JavaFX thread when required.
-6. JavaFX bindings update the visible controls.
+Session state follows this pipeline:
 
-For persistence actions, the interactor additionally calls `ConfigHandler`, which serializes through `Storage` and `FileStorage` to `config.json`, or reads and sanitizes the file before applying loaded data.
+`ViewBuilder` → `Controller` → `Interactor` → (`State`) `Controller` → `ViewModel` → `ViewBuilder`
+
+`ViewBuilder` invokes controller callbacks, the interactor applies the session operation and publishes a `State` snapshot, and the controller updates `ViewModel` on the JavaFX Application Thread when required. JavaFX bindings then update the visible controls.
+
+Configuration persistence follows this pipeline:
+
+`ViewBuilder` → `Controller` → `Interactor` → `ConfigHandler` → `Storage` → `FileStorage` → `config.json`
+
+Save operations serialize through this boundary. Load operations read through the same boundary, sanitize the configuration, apply it in the interactor, and return updated state through the session-state pipeline.
 
 ### Recommendation Flow
 
-1. The user selects **Request break recommendation now** during an active work session.
-2. `ViewBuilder` invokes the controller callback.
-3. `Controller` delegates to `Interactor`.
-4. The interactor creates a `RecommendationRequest` and calls `RecommendationService`.
-5. `GroqRecommendationService` uses Groq when configured or delegates to `FallbackRecommendationService` when needed.
-6. The returned `CompletableFuture<RecommendationResponse>` completes asynchronously.
-7. The interactor validates that the result is current and that work remains active.
-8. If `shouldBreak` is `true`, the interactor publishes the activity in `State`, the controller updates `ViewModel`, and the recommendation UI becomes visible.
-9. If `shouldBreak` is `false`, the interactor clears the pending request and publishes state without a recommendation dialog.
+`Controller` → `Interactor` → (`RecommendationRequest`) `RecommendationService` → (`RecommendationResponse`) `Interactor` → (`State`) `Controller` → `ViewModel` → `ViewBuilder`
+
+The interactor creates the request during an active work session. `GroqRecommendationService` uses Groq when configured and delegates to `FallbackRecommendationService` when required. The `CompletableFuture<RecommendationResponse>` completes asynchronously, after which the interactor verifies that the result is current and the work session remains active. If `shouldBreak` is `true`, the activity enters `State` and the recommendation dialog becomes visible; if `shouldBreak` is `false`, the pending request clears and no dialog is displayed.
 
 ## Local vs External Data Boundary
 
@@ -269,9 +267,9 @@ The current system has the following architectural limitations:
 
 A future production architecture could introduce a backend or proxy for centralized request validation and sanitization, rate limiting, controlled logging, and server-side secret handling. These are possible future improvements and are not implemented in the current branch.
 
-## Technology Summary
+## Technology and Tooling
 
-| Technology or component | Architectural role |
+| Technology or tool | Architectural role |
 | --- | --- |
 | Java 17 | Language and configured compiler/runtime target |
 | JavaFX | Desktop UI, observable properties, bindings, and application lifecycle |
@@ -279,11 +277,22 @@ A future production architecture could introduce a backend or proxy for centrali
 | Gson | JSON serialization and deserialization for configuration data |
 | JUnit 5 | Automated unit and integration-oriented testing framework |
 | Groq API | Optional external chat-completions provider |
-| `RecommendationService` | Asynchronous recommendation abstraction |
-| `FallbackRecommendationService` | Local rule-based recommendation implementation |
-| `config.json` / `ConfigHandler` / `Storage` | Local configuration data and persistence boundary |
-| `CompletableFuture` | Asynchronous recommendation and HTTP-result handling |
 | GitHub Actions | Java 17 CI running `mvn -B verify` |
+
+## Application Components
+
+| Component | Architectural role |
+| --- | --- |
+| `Main` | JavaFX entry point and production composition root |
+| `ViewBuilder` / `ViewModel` / `State` | UI construction, observable presentation state, and immutable application snapshots |
+| `Controller` | Coordination between UI callbacks, application logic, and JavaFX-thread state updates |
+| `Interactor` | Session, history, persistence coordination, and recommendation workflow |
+| `RecommendationRequest` / `RecommendationResponse` | Context sent to recommendation services and the resulting break decision/activity |
+| `RecommendationService` | Asynchronous recommendation abstraction |
+| `GroqRecommendationService` / `GroqHttpClient` | Groq integration and replaceable HTTP boundary |
+| `FallbackRecommendationService` | Local rule-based recommendation implementation |
+| `ConfigHandler` / `Storage` / `FileStorage` / `config.json` | Local configuration serialization and persistence boundary |
+| `CompletableFuture` | Asynchronous recommendation and HTTP-result handling |
 
 ## Team Responsibilities
 
