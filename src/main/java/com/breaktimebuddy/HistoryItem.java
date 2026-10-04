@@ -12,7 +12,6 @@ import java.time.Instant;
  * var openItem = HistoryItem.open(phase, beginTime);
  * var endTime = Instant.parse("2001-01-01T00:45:00Z");
  * HistoryItem item = openItem.close(endTime);
- * openItem = null; // Useless after the above line
  * }</pre>
  */
 public class HistoryItem implements Cloneable {
@@ -60,6 +59,9 @@ public class HistoryItem implements Cloneable {
   /**
    * A one-time builder for {@link HistoryItem}. Call {@link #close(Instant)} for the completed
    * object.
+   *
+   * The instance can't be reused; calling {@link #close(Instant)} more than once throws
+   * {@link IllegalStateException}.
    */
   public static class Open implements Cloneable {
     private boolean open;
@@ -76,22 +78,40 @@ public class HistoryItem implements Cloneable {
       item.beginTime = beginTime;
     }
 
+    /**
+     * Returns whether this builder is still open (has not been closed).
+     *
+     * @return true if open, false if already closed
+     */
     public boolean isOpen() {
       return open;
     }
 
+    /**
+     * Returns the phase of the session being built.
+     *
+     * @return the session phase
+     */
     public Phase phase() {
       return this.item.phase;
     }
 
+    /**
+     * Returns the begin time of the session being built.
+     *
+     * @return the begin time
+     */
     public Instant beginTime() {
       return this.item.beginTime;
     }
 
     /**
-     * @param endTime
-     * @throws IllegalStateException The method is called more than once.
-     * @return The completed item.
+     * Completes the session with an end time and returns the finished {@link HistoryItem}.
+     *
+     * @param endTime the end time of the session
+     * @return the completed history item
+     * @throws IllegalStateException thrown when close has already been called
+     * @throws IllegalArgumentException thrown when endTime is null
      */
     public HistoryItem close(Instant endTime) throws IllegalStateException {
       if (!open)
@@ -104,6 +124,14 @@ public class HistoryItem implements Cloneable {
     }
   }
 
+  /**
+   * Creates a new open builder for a history item.
+   *
+   * @param phase the session phase (work or break)
+   * @param beginTime the session begin time
+   * @return a new open builder
+   * @throws IllegalArgumentException thrown when phase or beginTime is null
+   */
   public static Open open(Phase phase, Instant beginTime) {
     return new Open(phase, beginTime);
   }
