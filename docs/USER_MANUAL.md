@@ -6,9 +6,20 @@ Break Time Buddy is a JavaFX desktop application that helps you track work and b
 
 AI-powered recommendations through Groq are optional. If Groq is not configured, is unavailable, or does not return a valid response, the application can use its rule-based fallback recommendation service.
 
+## Quick usage example
+
+1. Start the application.
+2. Set the preferred work length.
+3. Select **Not in session** to start a work session.
+4. Work for a period of time.
+5. Select **Request break recommendation now**.
+6. If a recommendation is displayed, select **Start Break** or **Not Now**.
+7. Review **History** after completing work or break periods.
+8. Select **Save config** if you want to save the supported local configuration and completed history.
+
 ## Starting the application
 
-Follow [INSTALLATION.md](INSTALLATION.md) for complete installation and configuration instructions.
+Starting the application requires Java 17 and Maven setup. Enabling optional Groq AI recommendations also requires setting the `GROQ_API_KEY` environment variable. These setup steps require some technical familiarity; follow [INSTALLATION.md](INSTALLATION.md) for complete instructions.
 
 From the project root directory, the normal Maven launch command is:
 
@@ -29,17 +40,17 @@ The main window contains the following controls and status information:
 - **Recommendation: [message]**: The recommendation display, shown when a recommendation is available.
 - **Start Break**: Accepts the displayed recommendation and starts a break.
 - **Not Now**: Dismisses the displayed recommendation without ending the active work session.
-- **Save config**: Saves supported local settings and completed history to `config.json`.
-- **Load config**: Loads supported local settings and completed history from `config.json`.
+- **Save config**: Saves supported local settings and completed history.
+- **Load config**: Loads supported local settings and completed history.
 - Configuration feedback: A timestamped **Save success**, **Load success**, **Save error: ...**, or **Load error: ...** message after a save or load attempt.
 
 ## Setting the preferred work length
 
 Use the **Preferred work length (1-300)** control to set the desired work-session length in minutes. You may use the spinner arrows or edit the number directly.
 
-The supported range is 1 through 300 minutes. The default is 50 minutes. Values are stored as whole minutes, and an entered value is constrained to the supported range.
+The supported range is 1 through 300 minutes. The default is 50 minutes. Values can be set in whole minutes.
 
-The preferred length is included in recommendation requests. Changing it does not automatically start, stop, or time a session.
+The preferred work length is considered when determining whether to recommend a break. Changing it does not automatically start, stop, or time a session.
 
 ## Tracking a work or break session
 
@@ -60,11 +71,15 @@ Only completed periods appear in **History**. Each entry shows `WORK` or `BREAK`
 
 Recommendation requests are associated with an active work session. While the session toggle reads **In session**, select **Request break recommendation now**.
 
+When configured, Break Time Buddy may use Groq AI to help decide whether to recommend a break and what activity to suggest. AI-generated recommendations may be inaccurate or unsuitable. They are general break and wellness suggestions, not medical advice.
+
 **Pending break recommendation: true** indicates that a request is in progress. The status returns to `false` when processing finishes or the request is canceled. Selecting the request button outside an active work session does not start a request. Repeated selections while a request is already pending do not create additional simultaneous requests.
 
-When `GROQ_API_KEY` is configured, the application first attempts to obtain a recommendation from Groq. Without a configured key—or if the Groq request fails, the service is unavailable, or the response is invalid—the application uses its rule-based fallback. The fallback selects a short break suggestion based on the completed-work-session count.
+When `GROQ_API_KEY` is configured, the application first asks Groq whether a break is currently needed. Without a configured key—or if the Groq request fails, the service is unavailable, or the response is invalid—the application uses its rule-based fallback. The fallback considers the elapsed work time in relation to the preferred work length and does not always recommend a break. When it does recommend one, the completed-work-session count helps determine the suggested activity.
 
-A recommendation is displayed only when a response is successfully associated with the still-active work session. Ending the work session while a request is pending cancels the pending request, so no recommendation is then displayed.
+A completed request may determine that a break is not currently needed. In that case, no recommendation message or **Start Break** and **Not Now** choices are displayed. When a break is recommended, the suggested activity is displayed with those choices.
+
+Ending the work session while a request is pending cancels the pending request and prevents an outdated recommendation from being displayed.
 
 ## Responding to a recommendation
 
@@ -83,7 +98,7 @@ Select **Save config** to write the following data to the local `config.json` fi
 
 The current active work or break period is not part of the saved history until that period is completed by toggling sessions.
 
-Select **Load config** to restore the saved session count, preferred work length, and completed history. Loaded values are validated: the session count cannot be negative, the preferred work length is constrained to 1–300 whole minutes, and invalid history records are omitted.
+Select **Load config** to restore the saved session count, preferred work length, and completed history.
 
 After an operation, the interface shows a timestamped **Save success** or **Load success** message. A failed operation shows **Save error: ...** or **Load error: ...** with error details.
 
@@ -112,6 +127,8 @@ AI-generated output can be inaccurate or unsuitable. Recommendations are general
 
 If Groq is not configured or available, or if a valid AI response cannot be obtained, the application can use its rule-based fallback. Using an environment variable reduces the risk of accidentally committing the Groq credential to source control, but it should not be considered production-grade secret protection for a distributed desktop application.
 
+Either recommendation service may determine that a break is not currently needed. In that case, the request completes without displaying a recommendation. The fallback considers the current work duration in relation to the preferred work length and provides an activity only when it determines that a break is appropriate.
+
 ## Troubleshooting
 
 ### The application does not start
@@ -120,7 +137,7 @@ Run the application from the project root with `mvn clean javafx:run`. Review an
 
 ### A recommendation does not appear
 
-Confirm that a work session is active and the toggle reads **In session** before selecting **Request break recommendation now**. Check **Pending break recommendation** for the request state. If you end the work session while the request is pending, the request is canceled.
+Confirm that a work session is active and the toggle reads **In session** before selecting **Request break recommendation now**. Check **Pending break recommendation** for the request state. A completed request may correctly determine that a break is not currently needed, in which case no recommendation appears. If you end the work session while the request is pending, the request is canceled.
 
 ### Groq is unavailable or not configured
 
@@ -141,14 +158,3 @@ Break Time Buddy targets Java 17. Verify Java with `java -version` and Maven wit
 - Recommendation behavior depends on the available and configured recommendation service.
 - Configuration is stored locally in `config.json`; there are no user accounts or cloud storage.
 - The Groq credential is configured through an environment variable. This reduces accidental source-control exposure but is not production-grade secret protection for a distributed desktop application.
-
-## Quick usage example
-
-1. Start the application.
-2. Set the preferred work length.
-3. Select **Not in session** to start a work session.
-4. Work for a period of time.
-5. Select **Request break recommendation now**.
-6. If a recommendation is displayed, select **Start Break** or **Not Now**.
-7. Review **History** after completing work or break periods.
-8. Select **Save config** if you want to save the supported local configuration and completed history.
