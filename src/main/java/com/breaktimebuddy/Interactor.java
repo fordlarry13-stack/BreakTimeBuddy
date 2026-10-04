@@ -12,7 +12,15 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import com.google.gson.JsonParseException;
 
-// TODO: Rename
+/**
+ * Core business logic for the application.
+ *
+ * Manages work/break session state, persists configuration, and coordinates break recommendations
+ * with the {@link RecommendationService}.
+ *
+ * @see Controller
+ * @see ViewModel
+ */
 public class Interactor {
   private record BreakRecommendationState(UUID id, String message) {
   }
@@ -29,10 +37,17 @@ public class Interactor {
   private LinkedList<HistoryItem> history = new LinkedList<>();
   private HistoryItem.Open nextHistoryItem;
   private AtomicBoolean breakRecommendationRequested = new AtomicBoolean();
-  private CompletableFuture<String> currentBreakRecommendationFuture;
+  private CompletableFuture<RecommendationResponse> currentBreakRecommendationFuture;
   private AtomicReference<BreakRecommendationState> breakRecommendationState =
       new AtomicReference<>();
 
+  /**
+   * Creates an interactor with the given dependencies.
+   *
+   * @param stateChangeListener receives state updates
+   * @param configHandler handles configuration persistence
+   * @param recommendationService generates break recommendations
+   */
   public Interactor(Consumer<State> stateChangeListener, ConfigHandler configHandler,
       RecommendationService recommendationService) {
     this.stateChangeListener = stateChangeListener;
@@ -49,6 +64,13 @@ public class Interactor {
     }
   }
 
+  /**
+   * Sets the preferred work length. Replaces {@code null} with the default value, clamps it between
+   * the minimum and the maximum, truncates it to a multiple of the unit, and notifies the state
+   * change listener.
+   *
+   * @param preferredWorkLength the preferred work length
+   */
   public void setPreferredWorkLength(Duration preferredWorkLength) {
     this.preferredWorkLength =
         preferredWorkLength == null ? ConfigData.getDefault().preferredWorkLength()
@@ -70,6 +92,11 @@ public class Interactor {
             : new DialogState(breakRecommendationState.id(), breakRecommendationState.message())));
   }
 
+  /**
+   * Toggles between work and break sessions. Increments the session count when ending a work
+   * session, finalizes the current history item, creates a new open history item for the next
+   * session, and notifies the state change listener.
+   */
   public void switchWorkBreak() {
     if (inSession)
       sessions++;
@@ -85,6 +112,11 @@ public class Interactor {
     notifyStateChange();
   }
 
+  /**
+   * Saves the current session count to persistent storage.
+   *
+   * @throws IOException thrown if an I/O error occurs during write
+   */
   public void saveConfig() throws IOException {
     ConfigData data = new ConfigData(sessions, preferredWorkLength,
         history.stream().map(e -> new ConfigData.HistoryItem(switch (e.phase()) {
@@ -94,6 +126,12 @@ public class Interactor {
     configHandler.write(data);
   }
 
+  /**
+   * Loads the session count from persistent storage and updates the state.
+   *
+   * @throws IOException thrown if an I/O error occurs during read
+   * @throws JsonParseException thrown if the configuration file contains invalid JSON
+   */
   public void loadConfig() throws IOException, JsonParseException {
     spreadConfigData(configHandler.read());
   }
@@ -109,7 +147,8 @@ public class Interactor {
     notifyStateChange();
   }
 
-  private void clearAndCancelBreakRecommendationRequest(CompletableFuture<String> future) {
+  private void clearAndCancelBreakRecommendationRequest(
+      CompletableFuture<RecommendationResponse> future) {
     if (future != null && future == currentBreakRecommendationFuture) {
       breakRecommendationRequested.set(false);
       currentBreakRecommendationFuture = null;
@@ -122,26 +161,35 @@ public class Interactor {
       return;
     if (!breakRecommendationRequested.compareAndSet(false, true))
       return;
-    CompletableFuture<String> future =
-        recommendationService.getRecommendation(new RecommendationRequest(sessions,
-            preferredWorkLength, Duration.between(nextHistoryItem.beginTime(), Instant.now()),
-            List.copyOf(history)));
+    CompletableFuture<RecommendationResponse> future = recommendationService
+        .getRecommendation(new RecommendationRequest(sessions, preferredWorkLength,
+            Duration.between(nextHistoryItem.beginTime(), Instant.now()), List.copyOf(history)));
     currentBreakRecommendationFuture = future;
-    future.whenComplete((message, error) -> {
+    future.whenComplete((response, error) -> {
       if (future != currentBreakRecommendationFuture)
         return;
-      if (error == null && inSession)
-        breakRecommendationState.set(new BreakRecommendationState(UUID.randomUUID(), message));
+      if (error == null && inSession && response.shouldBreak())
+        breakRecommendationState
+            .set(new BreakRecommendationState(UUID.randomUUID(), response.activity()));
       clearAndCancelBreakRecommendationRequest(future);
       notifyStateChange();
     });
     notifyStateChange();
   }
 
+  /**
+   * Requests a break recommendation immediately, bypassing the normal timing logic.
+   */
   public void requestBreakRecommendationNow() {
     requestBreakRecommendation();
   }
 
+  /**
+   * Accepts a break recommendation, ending the current work session and starting a break.
+   *
+   * @param messageId the ID of the recommendation; if it doesn't match the current recommendation,
+   *        the call is silently ignored
+   */
   public void acceptBreakRecommendation(UUID messageId) {
     breakRecommendationState.updateAndGet(state -> {
       if (state == null || !state.id().equals(messageId))
@@ -153,6 +201,12 @@ public class Interactor {
     notifyStateChange();
   }
 
+  /**
+   * Rejects a break recommendation, dismissing it without starting a break.
+   *
+   * @param messageId the ID of the recommendation; if it doesn't match the current recommendation,
+   *        the call is silently ignored
+   */
   public void rejectBreakRecommendation(UUID messageId) {
     breakRecommendationState.updateAndGet(state -> {
       if (state == null || !state.id().equals(messageId))

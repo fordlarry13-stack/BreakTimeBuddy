@@ -5,7 +5,13 @@ import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
+/**
+ * JavaFX application entry point.
+ *
+ * Initializes the dependency graph and launches the primary stage.
+ */
 public class Main extends Application {
+
   @Override
   public void start(Stage primaryStage) {
     Scene scene = new Scene(

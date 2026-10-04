@@ -20,7 +20,18 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 
-// TODO: Rename
+/**
+ * Presentation model for the UI.
+ *
+ * Exposes observable properties bound to the view. Updated by the {@link Controller} in response to
+ * {@link Interactor} state changes.
+ *
+ * The {@code preferredWorkLength} and {@code preferredWorkLengthInMinutes} properties are
+ * synchronized.
+ *
+ * The {@code configFeedbackTimestamp} and {@code configFeedbackMessage} properties display
+ * transient feedback after save/load operations (success or error messages).
+ */
 public class ViewModel {
   private final BooleanProperty inSession = new SimpleBooleanProperty();
   private final ReadOnlyStringWrapper sessionStatusText = new ReadOnlyStringWrapper();
@@ -44,6 +55,9 @@ public class ViewModel {
   private final ObjectProperty<LocalTime> configFeedbackTimestamp = new SimpleObjectProperty<>();
   private final StringProperty configFeedbackMessage = new SimpleStringProperty();
 
+  /**
+   * Creates a view model with default values and binds the derived properties.
+   */
   public ViewModel() {
     sessionStatusText.bind(Bindings.when(inSession).then("In session").otherwise("Not in session"));
     preferredWorkLength.addListener((_0, _1, value) -> {
@@ -88,158 +102,356 @@ public class ViewModel {
     });
   }
 
+  /**
+   * Returns whether a work session is currently active.
+   *
+   * @return true if a session is in progress, false otherwise
+   */
   public boolean getInSession() {
     return inSession.get();
   }
 
+  /**
+   * Returns the property for whether a work session is currently active.
+   *
+   * @return the in-session property
+   */
   public BooleanProperty isSessionProperty() {
     return inSession;
   }
 
+  /**
+   * Sets whether a work session is currently active.
+   *
+   * @param inSession true if a session is in progress, false otherwise
+   */
   public void setInSession(boolean inSession) {
     this.inSession.set(inSession);
   }
 
+  /**
+   * Returns the session status text.
+   *
+   * @return the session status text
+   */
   public String getSessionStatusText() {
     return sessionStatusText.get();
   }
 
+  /**
+   * Returns the read-only property for the session status text.
+   *
+   * @return the session status text property
+   */
   public ReadOnlyStringProperty sessionStatusTextProperty() {
     return sessionStatusText.getReadOnlyProperty();
   }
 
+  /**
+   * Returns the number of completed work sessions.
+   *
+   * @return the session count
+   */
   public int getSessions() {
     return sessions.get();
   }
 
+  /**
+   * Returns the property for the number of completed work sessions.
+   *
+   * @return the sessions property
+   */
   public IntegerProperty sessionsProperty() {
     return sessions;
   }
 
+  /**
+   * Sets the number of completed work sessions.
+   *
+   * @param sessions the session count
+   */
   public void setSessions(int sessions) {
     this.sessions.set(sessions);
   }
 
+  /**
+   * Returns the preferred work length.
+   *
+   * @return the preferred work length
+   */
   public Duration getPreferredWorkLength() {
     return preferredWorkLength.get();
   }
 
+  /**
+   * Returns the property for the preferred work length.
+   *
+   * @return the preferred work length property
+   */
   public ObjectProperty<Duration> preferredWorkLengthProperty() {
     return preferredWorkLength;
   }
 
+  /**
+   * Sets the preferred work length.
+   *
+   * @param preferredWorkLength the preferred work length
+   */
   public void setPreferredWorkLength(Duration preferredWorkLength) {
     this.preferredWorkLength.set(preferredWorkLength);
   }
 
+  /**
+   * Returns the preferred work length in minutes.
+   *
+   * @return the preferred work length in minutes
+   */
   public int getPreferredWorkLengthInMinutes() {
     return preferredWorkLengthInMinutes.get();
   }
 
+  /**
+   * Returns the property for the preferred work length in minutes.
+   *
+   * @return the preferred work length in minutes property
+   */
   public IntegerProperty preferredWorkLengthInMinutesProperty() {
     return preferredWorkLengthInMinutes;
   }
 
+  /**
+   * Sets the preferred work length in minutes.
+   *
+   * @param preferredWorkLengthInMinutes the preferred work length in minutes
+   */
   public void setPreferredWorkLengthInMinutes(int preferredWorkLengthInMinutes) {
     this.preferredWorkLengthInMinutes.set(preferredWorkLengthInMinutes);
   }
 
+  /**
+   * Returns the default preferred work length. It is set during initialization.
+   *
+   * @return the default preferred work length
+   */
   public Duration getDefaultPreferredWorkLength() {
     return defaultPreferredWorkLength.get();
   }
 
+  /**
+   * Returns the property for the default preferred work length. It is set during initialization.
+   *
+   * @return the default preferred work length property
+   */
   public ObjectProperty<Duration> defaultPreferredWorkLengthProperty() {
     return defaultPreferredWorkLength;
   }
 
+  /**
+   * Sets the default preferred work length. It is set during initialization. Using this method does
+   * NOT set the actual default.
+   *
+   * @param defaultPreferredWorkLength the default preferred work length
+   */
   public void setDefaultPreferredWorkLength(Duration defaultPreferredWorkLength) {
     this.defaultPreferredWorkLength.set(defaultPreferredWorkLength);
   }
 
+  /**
+   * Returns the default preferred work length in minutes. It is set during initialization.
+   *
+   * @return the default preferred work length in minutes
+   */
   public int getDefaultPreferredWorkLengthInMinutes() {
     return defaultPreferredWorkLengthInMinutes.get();
   }
 
+  /**
+   * Returns the property for the default preferred work length in minutes. It is set during
+   * initialization.
+   *
+   * @return the default preferred work length in minutes property
+   */
   public IntegerProperty defaultPreferredWorkLengthInMinutesProperty() {
     return defaultPreferredWorkLengthInMinutes;
   }
 
+  /**
+   * Sets the default preferred work length in minutes. It is set during initialization. Using this
+   * method does NOT set the actual default.
+   *
+   * @param defaultPreferredWorkLengthInMinutes the default preferred work length in minutes
+   */
   public void setDefaultPreferredWorkLengthInMinutes(int defaultPreferredWorkLengthInMinutes) {
     this.defaultPreferredWorkLengthInMinutes.set(defaultPreferredWorkLengthInMinutes);
   }
 
+  /**
+   * Returns the minimum work length.
+   *
+   * @return the minimum work length
+   */
   public int getMinPreferredWorkLengthInMinutes() {
     return minPreferredWorkLengthInMinutes.get();
   }
 
+  /**
+   * Returns the property for the minimum work length.
+   *
+   * @return the minimum work length property
+   */
   public ReadOnlyIntegerProperty minPreferredWorkLengthInMinutesProperty() {
     return minPreferredWorkLengthInMinutes.getReadOnlyProperty();
   }
 
+  /**
+   * Returns the maximum work length.
+   *
+   * @return the maximum work length
+   */
   public int getMaxPreferredWorkLengthInMinutes() {
     return maxPreferredWorkLengthInMinutes.get();
   }
 
+  /**
+   * Returns the property for the maximum work length.
+   *
+   * @return the maximum work length property
+   */
   public ReadOnlyIntegerProperty maxPreferredWorkLengthInMinutesProperty() {
     return maxPreferredWorkLengthInMinutes.getReadOnlyProperty();
   }
 
+  /**
+   * Returns the history of work and break sessions.
+   *
+   * @return the history
+   */
   public List<HistoryItem> getHistory() {
     return history;
   }
 
+  /**
+   * Returns the property for the history of work and break sessions.
+   *
+   * @return the history property
+   */
   public ListProperty<HistoryItem> historyProperty() {
     return history;
   }
 
+  /**
+   * Sets the history of work and break sessions.
+   *
+   * @param history the history to set
+   */
   public void setHistory(List<HistoryItem> history) {
     this.history.setAll(history);
   }
 
+  /**
+   * Returns whether a break recommendation has been requested.
+   *
+   * @return true if a recommendation was requested, false otherwise
+   */
   public boolean getBreakRecommendationRequested() {
     return breakRecommendationRequested.get();
   }
 
+  /**
+   * Returns the property for whether a break recommendation has been requested.
+   *
+   * @return the break recommendation requested property
+   */
   public BooleanProperty breakRecommendationRequestedProperty() {
     return breakRecommendationRequested;
   }
 
+  /**
+   * Sets whether a break recommendation has been requested.
+   *
+   * @param breakRecommendationRequested true if a recommendation was requested, false otherwise
+   */
   public void setBreakRecommendationRequested(boolean breakRecommendationRequested) {
     this.breakRecommendationRequested.set(breakRecommendationRequested);
   }
 
+  /**
+   * Returns the current dialog state.
+   *
+   * @return the dialog state, or null if no dialog is shown
+   */
   public DialogState getDialogState() {
     return dialogState.get();
   }
 
+  /**
+   * Returns the property for the current dialog state.
+   *
+   * @return the dialog state property
+   */
   public ObjectProperty<DialogState> dialogStateProperty() {
     return dialogState;
   }
 
+  /**
+   * Sets the current dialog state.
+   *
+   * @param dialogState the dialog state to display, or null to hide the dialog
+   */
   public void setDialogState(DialogState dialogState) {
     this.dialogState.set(dialogState);
   }
 
+  /**
+   * Returns the timestamp of the last configuration feedback.
+   *
+   * @return the feedback timestamp, or null if no feedback has been set
+   */
   public LocalTime getConfigFeedbackTimestamp() {
     return configFeedbackTimestamp.get();
   }
 
+  /**
+   * Returns the property for the configuration feedback timestamp.
+   *
+   * @return the config feedback timestamp property
+   */
   public ObjectProperty<LocalTime> configFeedbackTimestampProperty() {
     return configFeedbackTimestamp;
   }
 
+  /**
+   * Sets the timestamp of the last configuration feedback.
+   *
+   * @param configFeedbackTimestamp the timestamp to set
+   */
   public void setConfigFeedbackTimestamp(LocalTime configFeedbackTimestamp) {
     this.configFeedbackTimestamp.set(configFeedbackTimestamp);
   }
 
+  /**
+   * Returns the last configuration feedback message.
+   *
+   * @return the feedback message, or null if no feedback has been set
+   */
   public String getConfigFeedbackMessage() {
     return configFeedbackMessage.get();
   }
 
+  /**
+   * Returns the property for the configuration feedback message.
+   *
+   * @return the config feedback message property
+   */
   public StringProperty configFeedbackMessageProperty() {
     return configFeedbackMessage;
   }
 
+  /**
+   * Sets the last configuration feedback message.
+   *
+   * @param configFeedbackMessage the message to set
+   */
   public void setConfigFeedbackMessage(String configFeedbackMessage) {
     this.configFeedbackMessage.set(configFeedbackMessage);
   }
