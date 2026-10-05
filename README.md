@@ -240,15 +240,14 @@ A future production architecture could place AI communication behind a backend o
 
 Project documentation is maintained in the `docs/` directory.
 
-Current and final-release documentation includes:
+Final-release documentation includes:
 
 - `docs/architecture.md` — architecture and component information.
 - `docs/ai-recommendation-service.md` — AI recommendation implementation, validation, fallback, and testing information.
 - `docs/api-documentation.md` — API documentation guidelines.
 - `docs/INSTALLATION.md` — installation, setup, and application launch instructions.
 - `docs/DEVELOPER_GUIDE.md` — development environment and contribution guidance.
-
-Additional user documentation is being finalized through the team's documentation pull requests.
+- `docs/USER_MANUAL.md` — end-user setup, usage, recommendation, configuration, and troubleshooting guidance.
 
 ## Team
 
