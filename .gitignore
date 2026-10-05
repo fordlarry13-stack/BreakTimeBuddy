@@ -25,10 +25,11 @@ hs_err_pid*
 # IDE files
 .idea/
 *.iml
-.vscode/
 *.classpath
 *.project
 .settings/
 bin/
 out/
 build/
+target/
+*.local.json

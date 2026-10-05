@@ -1,0 +1,441 @@
+/*-
+Tests for Interactor class
+Partially AI-generated: Test cases
+ */
+package com.breaktimebuddy;
+
+import static org.junit.jupiter.api.Assertions.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import com.google.gson.JsonParseException;
+
+class InteractorTest {
+  private static final List<HistoryItem> testHistory = List.of(
+      HistoryItem.open(HistoryItem.Phase.WORK, Instant.ofEpochSecond(1, 2))
+          .close(Instant.ofEpochSecond(3, 4)),
+      HistoryItem.open(HistoryItem.Phase.BREAK, Instant.ofEpochSecond(5, 6))
+          .close(Instant.ofEpochSecond(7, 8)));
+  private static final List<ConfigData.HistoryItem> testHistoryData = List.of(
+      new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.WORK, Instant.ofEpochSecond(1, 2),
+          Instant.ofEpochSecond(3, 4)),
+      new ConfigData.HistoryItem(ConfigData.HistoryItem.Phase.BREAK, Instant.ofEpochSecond(5, 6),
+          Instant.ofEpochSecond(7, 8)));
+
+  private StateChangeCaptor stateChangeCaptor;
+  private FakeConfigHandler configHandler;
+  private FakeRecommendationService recommendationService;
+  private Interactor interactor;
+
+  @BeforeEach
+  void setUp() {
+    stateChangeCaptor = new StateChangeCaptor();
+    configHandler = new FakeConfigHandler();
+    recommendationService = new FakeRecommendationService();
+    interactor = new Interactor(stateChangeCaptor, configHandler, recommendationService);
+  }
+
+  /**
+   * Call {@link Interactor#switchWorkBreak}, then add a small delay. This is needed so session
+   * start and end times are distinct.
+   */
+  void switchWorkBreakAndDelay() {
+    interactor.switchWorkBreak();
+    try {
+      Thread.sleep(1);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+
+  @Test
+  void testInitialState() {
+    // Initially not in session
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.inSession());
+    assertEquals(0, state.sessions());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), state.preferredWorkLength());
+    assertEquals(List.of(), state.history());
+  }
+
+  @Test
+  void testSwitchWorkBreakStartsSession() {
+    // Toggle to start session
+    switchWorkBreakAndDelay();
+    // Should nswitchWorkBreakAndDelayow be in session, sessions count unchanged (still 0)
+    State state = stateChangeCaptor.lastState;
+    assertTrue(state.inSession());
+    assertEquals(0, state.sessions());
+    assertEquals(List.of(), state.history());
+  }
+
+  @Test
+  void testSwitchWorkBreakEndsSessionIncrementsCount() {
+    switchWorkBreakAndDelay();
+    // End the session (switchWorkBreak when in session)
+    switchWorkBreakAndDelay();
+    // Sessions incremented when ending
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.inSession());
+    assertEquals(1, state.sessions());
+    assertEquals(1, state.history().size());
+    assertEquals(HistoryItem.Phase.WORK, state.history().get(0).phase());
+  }
+
+  @Test
+  void testSwitchWorkBreakRemovesOldestItemOfLongHistory() throws InterruptedException {
+    final int HISTORY_LENGTH = 20;
+    // Fill the history
+    for (int i = 0; i < HISTORY_LENGTH + 1; i++)
+      switchWorkBreakAndDelay();
+
+    State state = stateChangeCaptor.lastState;
+    HistoryItem lastHistoryItem = state.history().get(state.history().size() - 1);
+    assertEquals(HISTORY_LENGTH, state.history().size());
+    assertTrue(state.history().contains(lastHistoryItem));
+
+    switchWorkBreakAndDelay();
+
+    state = stateChangeCaptor.lastState;
+    assertEquals(HISTORY_LENGTH, state.history().size());
+    assertFalse(state.history().contains(lastHistoryItem));
+  }
+
+  @Test
+  void testSetPreferredWorkLength() {
+    Duration min = Duration.of(PreferencesHelper.MIN_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    Duration max = Duration.of(PreferencesHelper.MAX_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH);
+    List<Duration> inputs = Arrays.asList(Duration.of(20, ChronoUnit.MINUTES), null,
+        min.dividedBy(2), max.multipliedBy(2), min);
+    List<Duration> expected = Arrays.asList(Duration.of(20, ChronoUnit.MINUTES),
+        Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+            PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH),
+        min, max, min);
+    List<Duration> outputs = inputs.stream().map(e -> {
+      interactor.setPreferredWorkLength(e);
+      return stateChangeCaptor.lastState.preferredWorkLength();
+    }).toList();
+    for (int i = 0; i < outputs.size(); i++) {
+      assertNotNull(outputs.get(i), String.valueOf(i));
+    }
+    assertIterableEquals(expected, outputs);
+  }
+
+  @Test
+  void testSaveConfigCallsConfigHandlerWrite() throws IOException {
+    // Set up state: end 3 sessions
+    for (int i = 0; i < 6; i++)
+      switchWorkBreakAndDelay();
+    interactor.saveConfig();
+    ConfigData data = configHandler.getLastDataWritten();
+    assertNotNull(data);
+    assertEquals(3, data.sessions());
+    assertEquals(Duration.of(PreferencesHelper.DEFAULT_PREFERRED_WORK_LENGTH,
+        PreferencesHelper.UNIT_PREFERRED_WORK_LENGTH), data.preferredWorkLength());
+    assertEquals(5, data.history().size());
+    for (int i = 0; i < 5; i++)
+      assertEquals(
+          i % 2 == 0 ? ConfigData.HistoryItem.Phase.WORK : ConfigData.HistoryItem.Phase.BREAK,
+          data.history().get(i).phase());
+  }
+
+  @Test
+  void testLoadConfigCallsConfigHandlerRead() throws IOException, JsonParseException {
+    configHandler
+        .setDataToReturn(new ConfigData(7, Duration.of(10, ChronoUnit.MINUTES), testHistoryData));
+    interactor.loadConfig();
+    State state = stateChangeCaptor.lastState;
+    assertEquals(7, state.sessions());
+    assertEquals(Duration.of(10, ChronoUnit.MINUTES), state.preferredWorkLength());
+    assertIterableEquals(testHistory, state.history());
+  }
+
+  @Test
+  void testSaveConfigThrowsIOExceptionWhenConfigHandlerThrowsIOException() {
+    configHandler.setThrowOnWrite(true);
+    assertThrows(IOException.class, () -> interactor.saveConfig());
+  }
+
+  @Test
+  void testLoadConfigThrowsIOExceptionWhenConfigHandlerThrowsIOException() {
+    configHandler.setThrowOnReadIOException(true);
+    assertThrows(IOException.class, () -> interactor.loadConfig());
+  }
+
+  @Test
+  void testLoadConfigThrowsJsonParseExceptionWhenConfigHandlerThrowsJsonParseException() {
+    configHandler.setThrowOnReadJsonParseException(true);
+    assertThrows(JsonParseException.class, () -> interactor.loadConfig());
+  }
+
+  @Test
+  void testRecommendationRequestInvokesServiceAndDisplaysResult() {
+    switchWorkBreakAndDelay();
+
+    interactor.requestBreakRecommendationNow();
+
+    assertEquals(1, recommendationService.callCount);
+    assertEquals(0, recommendationService.lastRequest.sessions());
+    assertTrue(stateChangeCaptor.lastState.breakRecommendationRequested());
+
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Take a short walk and stretch."));
+
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.breakRecommendationRequested());
+    assertNotNull(state.dialogState());
+    assertEquals("Take a short walk and stretch.", state.dialogState().message());
+  }
+
+  @Test
+  void testRecommendationIgnoreIfShouldRecommendFalse() {
+    switchWorkBreakAndDelay();
+    interactor.requestBreakRecommendationNow();
+
+    recommendationService.lastFuture.complete(new RecommendationResponse(false, ""));
+
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testRecommendationFailureClearsRequestWithoutOpeningDialog() {
+    switchWorkBreakAndDelay();
+    interactor.requestBreakRecommendationNow();
+
+    recommendationService.lastFuture.completeExceptionally(new RuntimeException("Simulated error"));
+
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testStaleRecommendationDoesNotReopenDialogAfterManualSwitch() {
+    switchWorkBreakAndDelay();
+    interactor.requestBreakRecommendationNow();
+
+    switchWorkBreakAndDelay();
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Slow recommendation response"));
+
+    assertTrue(recommendationService.lastFuture.isCancelled());
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.inSession());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testRecommendationRequestTwice() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Recommendation response 1"));
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Recommendation response 2"));
+
+    assertEquals(2, recommendationService.callCount);
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.breakRecommendationRequested());
+    assertNotNull(state.dialogState());
+    assertEquals("Recommendation response 2", state.dialogState().message());
+  }
+
+  @Test
+  void testNotInSessionBlocksRecommendation() {
+    // Initially not in session
+    interactor.requestBreakRecommendationNow();
+
+    assertEquals(0, recommendationService.callCount);
+  }
+
+  @Test
+  void testRecommendationDebouncing() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    interactor.requestBreakRecommendationNow();
+
+    assertEquals(1, recommendationService.callCount);
+  }
+
+  @Test
+  void testAcceptBreakRecommendation() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Recommendation response"));
+    UUID dialogId = stateChangeCaptor.lastState.dialogState().id();
+    interactor.acceptBreakRecommendation(dialogId);
+
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.inSession());
+    assertEquals(1, state.sessions());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testAcceptBreakRecommendationIdempotent() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Recommendation response"));
+    UUID dialogId = stateChangeCaptor.lastState.dialogState().id();
+    interactor.acceptBreakRecommendation(dialogId);
+    interactor.acceptBreakRecommendation(dialogId);
+
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.inSession());
+    assertEquals(1, state.sessions());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testRejectBreakRecommendation() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Recommendation response"));
+    UUID dialogId = stateChangeCaptor.lastState.dialogState().id();
+    interactor.rejectBreakRecommendation(dialogId);
+
+    State state = stateChangeCaptor.lastState;
+    assertTrue(state.inSession());
+    assertEquals(0, state.sessions());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testRejectBreakRecommendationIdempotent() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Recommendation response"));
+    UUID dialogId = stateChangeCaptor.lastState.dialogState().id();
+    interactor.rejectBreakRecommendation(dialogId);
+    interactor.rejectBreakRecommendation(dialogId);
+
+    State state = stateChangeCaptor.lastState;
+    assertTrue(state.inSession());
+    assertEquals(0, state.sessions());
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  @Test
+  void testManualSwitchClearsDialog() {
+    interactor.switchWorkBreak();
+    interactor.requestBreakRecommendationNow();
+    recommendationService.lastFuture
+        .complete(new RecommendationResponse(true, "Recommendation response"));
+
+    assertNotNull(stateChangeCaptor.lastState.breakRecommendationRequested());
+
+    interactor.switchWorkBreak();
+
+    State state = stateChangeCaptor.lastState;
+    assertFalse(state.breakRecommendationRequested());
+    assertNull(state.dialogState());
+  }
+
+  private static class StateChangeCaptor implements Consumer<State> {
+    private State lastState;
+
+    @Override
+    public void accept(State state) {
+      lastState = state;
+    }
+  }
+
+  /** A fake ConfigHandler for testing Interactor in isolation. */
+  private static class FakeConfigHandler extends ConfigHandler {
+    private ConfigData dataToReturn;
+    private boolean throwOnReadIOException;
+    private boolean throwOnReadJsonParseException;
+    private boolean throwOnWrite;
+    private ConfigData lastDataWritten;
+
+    public FakeConfigHandler() {
+      super(new Storage() {
+        @Override
+        public InputStream in() throws IOException {
+          throw new UnsupportedOperationException("Unimplemented method 'in'");
+        }
+
+        @Override
+        public OutputStream out() throws IOException {
+          throw new UnsupportedOperationException("Unimplemented method 'out'");
+        }
+      }); // Anonymous subclass, won't be used
+    }
+
+    public void setDataToReturn(ConfigData data) {
+      this.dataToReturn = data;
+    }
+
+    public ConfigData getLastDataWritten() {
+      return lastDataWritten;
+    }
+
+    public void setThrowOnReadIOException(boolean value) {
+      this.throwOnReadIOException = value;
+    }
+
+    public void setThrowOnReadJsonParseException(boolean value) {
+      this.throwOnReadJsonParseException = value;
+    }
+
+    public void setThrowOnWrite(boolean value) {
+      this.throwOnWrite = value;
+    }
+
+    @Override
+    public ConfigData read() throws IOException, JsonParseException {
+      if (throwOnReadIOException)
+        throw new IOException("Simulated read error");
+      if (throwOnReadJsonParseException)
+        throw new JsonParseException("Simulated read error");
+      if (dataToReturn == null)
+        throw new IllegalStateException("dataToReturn can not be null");
+      return dataToReturn;
+    }
+
+    @Override
+    public void write(ConfigData data) throws IOException {
+      if (throwOnWrite)
+        throw new IOException("Simulated write error");
+      this.lastDataWritten = data;
+    }
+  }
+  private static class FakeRecommendationService implements RecommendationService {
+    private int callCount;
+    private RecommendationRequest lastRequest;
+    private CompletableFuture<RecommendationResponse> lastFuture;
+
+    @Override
+    public CompletableFuture<RecommendationResponse> getRecommendation(
+        RecommendationRequest request) {
+      callCount++;
+      lastRequest = request;
+      return lastFuture = new CompletableFuture<>();
+    }
+  }
+}
