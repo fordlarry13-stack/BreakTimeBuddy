@@ -245,8 +245,10 @@ Current and final-release documentation includes:
 - `docs/architecture.md` — architecture and component information.
 - `docs/ai-recommendation-service.md` — AI recommendation implementation, validation, fallback, and testing information.
 - `docs/api-documentation.md` — API documentation guidelines.
+- `docs/INSTALLATION.md` — installation, setup, and application launch instructions.
+- `docs/DEVELOPER_GUIDE.md` — development environment and contribution guidance.
 
-Additional installation, user, and developer documentation is being finalized through the team's documentation pull requests.
+Additional user documentation is being finalized through the team's documentation pull requests.
 
 ## Team
 
